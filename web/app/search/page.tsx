@@ -80,7 +80,7 @@ export default function Search() {
     <main className="wrap">
       <div className="boardhead">
         <h1 className="h1">Search</h1>
-        <p className="sub">Free-text search across every listing — name, description, category, broker. Click any column header to sort.</p>
+        <p className="sub">Search every listing by name, description, category, or broker. Click any column header to sort.</p>
         <div className="searchbar">
           <input className="searchinput" placeholder="e.g. HVAC distributor, dental, recurring revenue…"
             value={q} onChange={(e) => setQ(e.target.value)}

@@ -102,9 +102,9 @@ export default function Brokers() {
     <main className="wrap" style={{ maxWidth: 1080 }}>
       <h1 className="h1">Broker quality</h1>
       <p className="sub" style={{ maxWidth: "none", marginBottom: 16 }}>
-        Every source we scrape, how much it has produced, and whether it has gone quiet. Add new brokers for the next
-        scrape, archive the ones that aren&apos;t earning their keep, and turn on edit mode to fix a name or link.
-        Click any column header to sort.
+        Every source in the scrape, its output, and whether it has gone quiet. Add sources for the next run,
+        archive the ones that no longer produce, and use edit mode to correct a name or link. Click any column
+        header to sort.
       </p>
 
       <form className="panel addform" onSubmit={addBroker}>

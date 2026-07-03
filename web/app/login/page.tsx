@@ -19,13 +19,12 @@ export default function Login() {
     <main className="wrap" style={{ maxWidth: 440 }}>
       <h1 className="h1" style={{ marginTop: 24 }}>Sign in</h1>
       <p className="note" style={{ marginBottom: 20 }}>
-        No passwords. Enter your email and we&apos;ll send a one-time link. Access is limited to the
-        two operators on the desk.
+        Passwordless. Enter your email to receive a one-time sign-in link. Access is limited to approved operators.
       </p>
 
       {state === "sent" ? (
         <div className="panel">
-          <div className="live" style={{ marginBottom: 10 }}>check your inbox</div>
+          <div className="live" style={{ marginBottom: 10 }}>Check your inbox</div>
           <p className="note" style={{ margin: 0 }}>
             If <b>{email}</b> is on the list, a sign-in link is on its way. It expires in 15 minutes.
           </p>

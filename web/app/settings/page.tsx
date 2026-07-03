@@ -89,8 +89,8 @@ export default function Settings() {
 
   return (
     <main className="wrap" style={{ maxWidth: 820 }}>
-      <h1 className="h1">Thesis setup</h1>
-      <p className="sub" style={{ marginBottom: 16 }}>Everything that decides a deal lives here, not in code. Edit it and the whole corpus re-ranks instantly — no re-scraping, no cost.</p>
+      <h1 className="h1">Thesis</h1>
+      <p className="sub" style={{ marginBottom: 16 }}>Define what qualifies: keywords, size band, geography, and flags. Changes re-rank every listing instantly — no re-scrape, no cost.</p>
       <div className="lens" style={{ marginBottom: 20 }} role="group" aria-label="Thesis">
         {["water", "healthcare"].map((t) => (
           <button key={t} className={t} aria-pressed={thesis === t} onClick={() => setThesis(t)}><span className="dot" />{t === "water" ? "Water" : "Healthcare"}</button>

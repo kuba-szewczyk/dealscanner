@@ -42,8 +42,8 @@ export default function Shortlist() {
       <div className="boardhead">
         <h1 className="h1">Shortlist</h1>
         <p className="sub" style={{ maxWidth: "none" }}>
-          Every verdict cast on {LABEL[thesis]} deals, captured with the full deal context at vote time. Drag a deal
-          between sections to re-categorize it — this is the record the future instinct model will learn from.
+          Every verdict on {LABEL[thesis]} deals, saved with the deal&apos;s full context at vote time. Drag a deal
+          between columns to re-categorize. These votes are the training data for the ranking model.
         </p>
         <div className="filterbar">
           <div className="lens" role="group" aria-label="Thesis">

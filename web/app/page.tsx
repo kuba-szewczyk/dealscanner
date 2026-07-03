@@ -122,7 +122,7 @@ export default function Board() {
     <main className="wrap">
       <div className="boardhead">
         <h1 className="h1">{LABEL[thesis]} deals</h1>
-        <p className="sub">One engine, your thesis. Every deal is scored from the same shared database — switch the lens to see the other thesis re-rank from identical data.</p>
+        <p className="sub">New businesses that match your acquisition thesis, ranked by fit and refreshed daily. Switch thesis to re-score the same listings.</p>
         <div className="toolbar">
           <div className="lens" role="group" aria-label="Thesis">
             {["water", "healthcare"].map((t) => (
@@ -160,7 +160,7 @@ export default function Board() {
 
       {loading && <p className="note">Loading deals…</p>}
       {!loading && filtered.length === 0 && (
-        <div className="panel note">No deals match. Loosen the filters above, or the keywords / size band in Thesis setup.</div>
+        <div className="panel note">No deals match these filters. Widen the date window, or adjust the keywords and size band under Thesis.</div>
       )}
 
       {groups.map((g) => (

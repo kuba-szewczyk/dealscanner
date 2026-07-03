@@ -47,10 +47,10 @@ def _compose(s: dict, slug: str) -> tuple[str, str]:
     subject = f"DealScanner — {n} new {name} deal{'' if n == 1 else 's'} today ({datetime.now():%b %-d})"
     body = f"""\
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;color:#1e293b">
-  <p style="font-size:15px">Good morning — today's crawl is done and your board is updated.</p>
+  <p style="font-size:15px">Today's scan is complete. New {name} deals that clear your thesis are below.</p>
   <p style="font-size:22px;font-weight:700;margin:6px 0">{n} new {name} deal{'' if n == 1 else 's'}
      <span style="font-size:14px;font-weight:400;color:#64748b">qualifying today</span></p>
-  <ul style="margin:6px 0 0 18px;padding:0;font-size:14px">{samples or "<li style=color:#94a3b8>— nothing new clears the thesis today —</li>"}</ul>
+  <ul style="margin:6px 0 0 18px;padding:0;font-size:14px">{samples or "<li style=color:#94a3b8>No new deals cleared the thesis today.</li>"}</ul>
   <p style="margin:22px 0">
     <a href="{_link(slug)}" style="background:#2563eb;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:600;font-size:15px">View today's {name} deals →</a>
   </p>

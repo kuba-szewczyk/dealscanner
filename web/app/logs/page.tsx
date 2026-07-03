@@ -8,10 +8,10 @@ export default function Logs() {
 
   return (
     <main className="wrap" style={{ maxWidth: 900 }}>
-      <h1 className="h1">Activity &amp; cost</h1>
+      <h1 className="h1">Engine log</h1>
       <p className="sub" style={{ marginBottom: 18 }}>
-        One ledger for everything the engine has done — what ran, what it produced, and what it cost.
-        No hunting through log files; the spend is a number you can read.
+        A raw record of every engine run — what ran, what it produced, and what it cost.
+        For the day-by-day cost view, see Spend.
       </p>
 
       {d && (
