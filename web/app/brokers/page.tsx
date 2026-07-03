@@ -84,7 +84,13 @@ export default function Brokers() {
       <td className="num">{r.total}</td>
       <td className="num">{r.last30}</td>
       <td className="num">{seen(r.days_since)}</td>
-      <td><span className="strip">{(r.week || []).map((c, i) => <i key={i} className={c} title={`day -${6 - i}`} />)}</span></td>
+      <td><span className="strip">{(r.week || []).map((c, i) => {
+        const daysAgo = 6 - i;
+        const meaning = c === "g" ? "ran — new listings" : c === "x" ? "ran — nothing new"
+          : c === "e" ? "scrape error / blocked" : "no scan / not added yet";
+        const when = daysAgo === 0 ? "today" : daysAgo === 1 ? "yesterday" : `${daysAgo} days ago`;
+        return <i key={i} className={`${c}${i === 6 ? " today" : ""}`} title={`${when}: ${meaning}`} />;
+      })}</span></td>
       <td className="num">
         {isArch ? <button className="miniact" onClick={() => setStatus(r.broker, "live")}>Restore</button>
           : <button className="miniact" onClick={() => setStatus(r.broker, "archived")}>Archive</button>}
@@ -110,10 +116,17 @@ export default function Brokers() {
       </form>
 
       <div className="legend">
-        <span><b style={{ color: "var(--good)" }}>● active</b> — new listings in the last 7 days</span>
-        <span><b style={{ color: "var(--amber)" }}>● inactive</b> — last new listing 8–30 days ago</span>
-        <span><b style={{ color: "var(--red)" }}>● degraded</b> — nothing new in over 30 days</span>
-        <span><b>7-day strip:</b> <i className="lg g" /> new · <i className="lg x" /> none · <i className="lg n" /> no data yet · <i className="lg e" /> error</span>
+        <span><b>Health:</b>&nbsp;
+          <b style={{ color: "var(--good)" }}>● active</b> new in last 7d ·
+          <b style={{ color: "var(--amber)" }}>● inactive</b> 8–30d ago ·
+          <b style={{ color: "var(--red)" }}>● degraded</b> 30d+</span>
+        <span><b>7-day activity</b> — left = 7 days ago, right (outlined) = today:&nbsp;
+          <i className="lg g" /> ran, new listings ·
+          <i className="lg x" /> ran, nothing new ·
+          <i className="lg n" /> no scan / not added yet ·
+          <i className="lg e" /> scrape error or blocked</span>
+        <span><b style={{ color: "#b91c1c" }}>⛔ blocked ×N</b> — the broker&apos;s site returned a bot-block N times, so new
+          listings couldn&apos;t be fetched those days. Earlier listings you already have from them are unaffected.</span>
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
@@ -127,7 +140,7 @@ export default function Brokers() {
           <thead><tr>
             {th("broker", "Broker")}{th("health", "Health")}{th("total", "Listings", "num")}
             {th("last30", "30d", "num")}{th("days_since", "Last seen", "num")}
-            <th>Last 7 days</th><th></th>
+            <th className="striphead">7-day activity <span className="dir">old → today</span></th><th></th>
           </tr></thead>
           <tbody>{sorted.map((r) => RowEl(r))}</tbody>
         </table>
