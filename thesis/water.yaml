@@ -1,0 +1,127 @@
+# Water / wastewater / stormwater thesis (Alex). Ported verbatim from v1 config.py.
+# This is a SEED DEFAULT: on first run it initializes the editable account_settings
+# row for the 'water' account. After that, edits happen in the DB / Settings page.
+slug: water
+name: "Water / Wastewater"
+owner_email: null
+
+size:
+  ebitda_min: 1000000      # EBITDA band $1M-$5M ...
+  ebitda_max: 5000000
+  sde_min: 1500000         # ... OR SDE >= $1.5M
+  reject_below_ask: 1000000  # auto-reject if asking price or revenue < $1M
+
+keywords:
+  # Single Tier-1 match = relevant.
+  tier1:
+    - water treatment
+    - wastewater treatment
+    - water softener
+    - water softening
+    - reverse osmosis
+    - ro system
+    - water filtration
+    - water filter system
+    - water filter service
+    - water filter dealer
+    - water conditioning
+    - water conditioner
+    - kinetico
+    - culligan
+    - ecowater
+    - hague quality water
+    - aquasana
+    - water-right
+    - watercare
+    - master water
+    - atlantic filter
+    - association of water technologies
+    - water well drilling
+    - well drilling service
+    - well drilling company
+    - well pump service
+    - well pump installation
+    - water utility
+    - water and sewer utility
+    - water and wastewater operations
+    - contract operations and maintenance
+    - backflow prevention
+    - backflow testing
+    - legionella
+    - cooling tower treatment
+    - cooling tower chemicals
+    - boiler water treatment
+    - industrial water treatment
+    - process water treatment
+    - stormwater compliance
+    - stormwater management
+    - swppp
+    - biosolids
+    - septic service
+    - septic pumping
+    - septic installation
+    - water meter installation
+    - water submetering
+    - lake management
+    - pond management
+    - ion exchange
+    - deionized water
+    - water hauling
+    - bulk water delivery
+  # Tier-2 counts ONLY when paired with a context word.
+  tier2:
+    - service and rental
+    - equipment rental
+    - dealership
+    - distributor
+    - installation and service
+    - o&m
+    - operations and maintenance
+    - compliance services
+    - testing services
+    - chemical treatment
+    - membrane
+    - filtration
+    - purification
+    - conditioning
+    - softening
+    - aeration
+    - metering
+    - environmental services
+  context:
+    - water
+    - wastewater
+    - sewer
+    - plumbing
+    - utility
+    - treatment
+    - filtration
+    - well
+  # Present alongside a positive match -> cap relevance (mixed business).
+  negative:
+    - water damage
+    - water restoration
+    - flood restoration
+    - water park
+    - bottled water
+    - waterproofing
+    - swimming pool service
+    - pool cleaning
+    - car wash
+    - fire sprinkler
+    - fire suppression
+
+geo:
+  tier1_metros: [charlotte, raleigh, durham, raleigh-durham, washington dc, arlington, bethesda, alexandria]
+  tier2_states: [NC, SC, GA, VA, MD, DC, DE, MA, NH, NY, NJ, CT, CA, HI]
+
+categories:
+  exclude: []   # water beats all industry exclusions; rely on global_exclusions.yaml only
+
+flags:
+  positive: [geo_t1, geo_t2, margin_gt_20, owner_retiring, recurring_40]
+  negative: [low_margin_lt_15, overpriced, franchise_resale, partial]
+
+ranking:
+  # fit_score = relevance*w_rel + flag_score*w_flags
+  weights: {relevance: 2.0, flag_score: 1.0}

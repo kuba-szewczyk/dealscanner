@@ -1,0 +1,37 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+credentials/
+client_secret*.json
+token*.json
+*.auth_secret
+.auth_secret
+
+# data (restored from backup on deploy, not via git)
+data/
+*.db
+*.sqlite*
+
+# node / next
+node_modules/
+.next/
+out/
+next-env.d.ts
+
+# python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+
+# os / editor
+.DS_Store
+*.log
+.claude/settings.local.json
+
+# internal ops docs (incident forensics, server handover) — local only
+V3-REBUILD-PLAN.md
+V3-SERVER-SETUP-HANDOVER.md

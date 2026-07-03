@@ -1,0 +1,13 @@
+# DealScanner v3 — /etc/caddy/Caddyfile
+# Replace dealscanner.us with the live domain. The sslip.io host is the
+# no-DNS fallback (replace 1.2.3.4 with the server IP, dots as dashes work too).
+
+dealscanner.us, www.dealscanner.us, 1.2.3.4.sslip.io {
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy 127.0.0.1:8099
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3001
+	}
+}

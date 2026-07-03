@@ -1,0 +1,49 @@
+# GLOBAL pre-filter (master settings). Applies to EVERY account, runs at the code
+# level BEFORE any Claude call — the token saver. Ported from v1 NO_BRAINER_EXCLUDED.
+# Deliberately TIGHT: only unambiguous consumer non-targets. Ambiguous categories
+# (construction, manufacturing, oil/gas, retail) are NOT here — they go to full
+# per-thesis scoring so water/healthcare businesses are never wrongly dropped.
+name: "Global exclusions"
+exclude:
+  Restaurant_Food:
+    - restaurant
+    - pizzeria
+    - " cafe"
+    - bistro
+    - diner
+    - bakery
+    - coffee shop
+    - food truck
+    - catering
+    - brewery
+    - taqueria
+    - ice cream
+    - juice bar
+    - sandwich shop
+    - " deli"
+    - donut
+    - doughnut
+  Bar_Nightlife:
+    - bar & grill
+    - bar and grill
+    - nightclub
+    - sports bar
+    - wine bar
+    - cocktail lounge
+  Hospitality_Lodging:
+    - hotel
+    - motel
+    - bed & breakfast
+    - bed and breakfast
+  Personal_Care:
+    - hair salon
+    - nail salon
+    - nail spa
+    - day spa
+    - barbershop
+    - barber shop
+    - med spa
+    - medspa
+    - massage
+    - tanning salon
+    - tattoo

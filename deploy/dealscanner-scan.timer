@@ -1,0 +1,9 @@
+[Unit]
+Description=DealScanner daily pipeline at 07:00 ET (server tz is America/New_York)
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,83 @@
+# Healthcare thesis (Kuba's search fund). Lighter second thesis — proves the engine
+# is thesis-agnostic. Seed default for the 'healthcare' account; editable after.
+slug: healthcare
+name: "Healthcare Services"
+owner_email: null
+
+size:
+  ebitda_min: 1000000
+  ebitda_max: 5000000
+  sde_min: 1500000
+  reject_below_ask: 1000000
+
+keywords:
+  tier1:
+    - home health
+    - home care
+    - hospice
+    - dental practice
+    - dental group
+    - dso
+    - medical practice
+    - physician practice
+    - urgent care
+    - behavioral health
+    - mental health
+    - physical therapy
+    - occupational therapy
+    - outpatient
+    - ambulatory surgery
+    - medical billing
+    - revenue cycle management
+    - durable medical equipment
+    - medical device
+    - pharmacy
+    - veterinary
+    - veterinary practice
+    - dialysis
+    - imaging center
+    - diagnostic lab
+    - clinical lab
+    - skilled nursing
+    - assisted living
+    - healthcare staffing
+    - medical staffing
+  tier2:
+    - clinic
+    - practice
+    - services
+    - staffing
+    - billing
+    - care
+    - therapy
+    - rehabilitation
+    - wellness
+  context:
+    - health
+    - medical
+    - patient
+    - clinical
+    - care
+    - dental
+    - physician
+    - nursing
+  negative:
+    - medical spa
+    - med spa
+    - weight loss
+    - tanning
+    - cosmetic
+
+geo:
+  tier1_metros: [charlotte, raleigh, durham, raleigh-durham, washington dc, atlanta, nashville]
+  tier2_states: [NC, SC, GA, VA, MD, DC, TN, FL, TX]
+
+categories:
+  exclude: []
+
+flags:
+  positive: [geo_t1, geo_t2, margin_gt_20, owner_retiring, recurring_40]
+  negative: [low_margin_lt_15, overpriced, franchise_resale, partial]
+
+ranking:
+  weights: {relevance: 2.0, flag_score: 1.0}

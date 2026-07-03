@@ -1,0 +1,9 @@
+[Unit]
+Description=DealScanner v3 daily scrape + digest (oneshot)
+
+[Service]
+Type=oneshot
+User=dealscanner
+WorkingDirectory=/opt/dealscanner-v2
+EnvironmentFile=/opt/dealscanner-v2/.env
+ExecStart=/opt/dealscanner-v2/deploy/scan.sh
