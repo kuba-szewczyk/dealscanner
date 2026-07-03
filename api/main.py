@@ -17,7 +17,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 import auth as authmod
-from dealscanner_engine import db, evaluator, thesis
+from dealscanner_engine import config, db, evaluator, thesis
+
+
+def _safe_base(request: Request) -> str:
+    """Base URL for links/redirects. Trust the request Host ONLY if it is allow-listed
+    (preserves the domain + www + configured hosts); otherwise fall back to the
+    canonical APP_BASE_URL. Blocks host-header poisoning of emailed magic links."""
+    host = request.headers.get("host", "").lower()
+    if host in config.trusted_hosts() or host.endswith(".sslip.io"):
+        scheme = request.headers.get("x-forwarded-proto") or "https"
+        return f"{scheme}://{host}"
+    return config.app_base_url()
 
 app = FastAPI(title="DealScanner v2 API", version="2.0.0-dev")
 app.add_middleware(
@@ -124,10 +135,8 @@ def auth_request(request: Request, payload: dict = Body(...)):
     (never leaks who is on the list)."""
     email = (payload.get("email") or "").strip().lower()
     if email in authmod.ALLOW_LIST:
-        host = request.headers.get("host", "localhost:8099")
-        scheme = "https" if "sslip.io" in host or "dealscanner.us" in host else "http"
         token = authmod.make_login_token(email)
-        link = f"{scheme}://{host}/api/auth/verify?token={token}"
+        link = f"{_safe_base(request)}/api/auth/verify?token={token}"
         try:
             authmod.send_magic_link(email, link)
         except Exception as e:
@@ -139,14 +148,12 @@ def auth_request(request: Request, payload: dict = Body(...)):
 def auth_verify(token: str, request: Request):
     """Validate the link, set a 14-day session cookie, bounce to the board."""
     email = authmod.email_from_login_token(token)
-    host = request.headers.get("host", "")
-    base = f"https://{host}" if ("sslip.io" in host or "dealscanner.us" in host) else f"http://{host}"
+    base = _safe_base(request)
     if not email:
         return RedirectResponse(f"{base}/login?error=expired", status_code=303)
     resp = RedirectResponse(f"{base}/", status_code=303)
-    secure = "sslip.io" in host or "dealscanner.us" in host
     resp.set_cookie("ds_session", authmod.make_session(email), max_age=60 * 60 * 24 * 14,
-                    httponly=True, samesite="lax", secure=secure, path="/")
+                    httponly=True, samesite="lax", secure=base.startswith("https"), path="/")
     return resp
 
 

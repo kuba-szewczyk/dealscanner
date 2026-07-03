@@ -52,3 +52,22 @@ def recipients() -> dict[str, str]:
 
 def default_thesis() -> str:
     return os.environ.get("DEFAULT_THESIS", "healthcare")
+
+
+def app_base_url() -> str:
+    """Canonical, trusted base URL for links we email (magic links, digests).
+
+    NEVER derive this from a client-supplied Host header — that enables host-header
+    poisoning where an operator's login link points at an attacker domain.
+    """
+    return os.environ.get("APP_BASE_URL", "https://dealscanner.us").rstrip("/")
+
+
+def trusted_hosts() -> set[str]:
+    """Host header values allowed to set the request's own base URL. Anything else
+    falls back to APP_BASE_URL. Defaults cover the prod domain; extend via TRUSTED_HOSTS.
+    """
+    raw = os.environ.get("TRUSTED_HOSTS", "")
+    extra = {h.strip().lower() for h in raw.split(",") if h.strip()}
+    base = app_base_url().split("://", 1)[-1]
+    return {base, f"www.{base}"} | extra

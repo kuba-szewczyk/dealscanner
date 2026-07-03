@@ -44,6 +44,20 @@ export const api = {
     post("/votes/recategorize", { account, listing_id, verdict }).then((r) => r.status),
 };
 
+// Only allow http(s) URLs into an <a href>. Listing/broker URLs come from scraped
+// pages (attacker-influencable), and React does NOT block `javascript:`/`data:`
+// schemes in href — so a hostile scrape could otherwise inject a click-to-run link.
+// Anything not clearly http(s) becomes a harmless no-op ("#").
+export function safeHref(url: string | null | undefined): string {
+  if (!url) return "#";
+  try {
+    const u = new URL(url, "https://dealscanner.us");
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : "#";
+  } catch {
+    return "#";
+  }
+}
+
 export type Deal = {
   id: number; broker: string; business_name: string; category: string;
   state: string; city: string; sde: number; ebitda: number; revenue: number;

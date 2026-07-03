@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { api, safeHref } from "@/lib/api";
 
 type Row = { broker: string; url: string; status: string; total: number; last30: number; days_since: number; health: string; week: string[]; block_count?: number; last_blocked_at?: string | null };
 const HEALTH_RANK: Record<string, number> = { active: 0, inactive: 1, degraded: 2, pending: 3 };
@@ -67,7 +67,7 @@ export default function Brokers() {
       <>
         <span className={`bname ${editMode ? "editable" : ""}`} title={editMode ? "Click to edit" : r.broker}
           onClick={() => editMode && startEdit(r)}>{r.broker}</span>
-        {r.url && !editMode && <a className="exticon" href={r.url} target="_blank" rel="noreferrer" title="Open broker site">↗</a>}
+        {r.url && !editMode && <a className="exticon" href={safeHref(r.url)} target="_blank" rel="noreferrer" title="Open broker site">↗</a>}
         {!!r.block_count && r.block_count > 0 && (
           <span className="blocktag" title={`Firecrawl couldn't load this broker's pages ${r.block_count}× (last ${(r.last_blocked_at || "").slice(0, 10)}). Likely unscrapeable long-term.`}>
             ⛔ blocked ×{r.block_count}

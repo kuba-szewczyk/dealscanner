@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { api, Deal } from "@/lib/api";
+import { api, Deal, safeHref } from "@/lib/api";
 
 const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
 const FLAG_LABEL: Record<string, string> = {
@@ -188,7 +188,7 @@ export default function Board() {
                 ) : null}
                 <div className="dealfoot">
                   <span className="broker">{d.broker}</span>
-                  <a className="viewlink" href={d.listing_url} target="_blank" rel="noreferrer">view listing ↗</a>
+                  <a className="viewlink" href={safeHref(d.listing_url)} target="_blank" rel="noreferrer">view listing ↗</a>
                 </div>
               </div>
               <div className="fincol num">
@@ -232,7 +232,7 @@ export default function Board() {
                         <li key={d.id}>
                           <span className="nqname">{d.business_name}</span>
                           <span className="nqdash"> — </span>
-                          <a href={d.listing_url} target="_blank" rel="noreferrer">{d.broker || "view listing"}</a>
+                          <a href={safeHref(d.listing_url)} target="_blank" rel="noreferrer">{d.broker || "view listing"}</a>
                         </li>
                       ))}
                     </ul>

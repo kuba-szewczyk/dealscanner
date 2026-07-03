@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, safeHref } from "@/lib/api";
 
 const ORDER = ["yes", "maybe", "no"];
 const TITLE: Record<string, string> = { yes: "Yes — chase it", maybe: "Maybe — worth a look", no: "No — pass" };
@@ -53,7 +53,7 @@ export default function Voting() {
                       <span style={{ color: "var(--faint)", letterSpacing: "-2px", fontSize: 14 }}>⋮⋮</span>
                       <span className="vchip" style={{ background: "var(--blue-soft)", color: "var(--blue-ink)" }}>{x.thesis}</span>
                       <span className="vname">
-                        {x.listing_url ? <a draggable={false} href={x.listing_url} target="_blank" rel="noreferrer">{x.business_name}</a> : x.business_name}
+                        {x.listing_url ? <a draggable={false} href={safeHref(x.listing_url)} target="_blank" rel="noreferrer">{x.business_name}</a> : x.business_name}
                       </span>
                       <span className="vmeta">{x.operator?.split("@")[0]} · {(x.created_at || "").slice(0, 10)}</span>
                     </div>

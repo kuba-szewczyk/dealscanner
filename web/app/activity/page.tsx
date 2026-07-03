@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, safeHref } from "@/lib/api";
 
 const CAT_CLASS: Record<string, string> = {
   "Healthcare": "c-teal", "Restaurant & Food": "c-pink", "Construction & Trades": "c-amber",
@@ -114,7 +114,7 @@ export default function Activity() {
                         <td className="r">{fmtM(r.sde)}</td>
                         <td className="r">{fmtM(r.asking_price)}</td>
                         <td className="muted">{fmtDate(r.first_seen)}</td>
-                        <td><a className="viewlink" href={r.listing_url} target="_blank" rel="noreferrer">↗</a></td>
+                        <td><a className="viewlink" href={safeHref(r.listing_url)} target="_blank" rel="noreferrer">↗</a></td>
                       </tr>
                     ))}
                   </tbody>
