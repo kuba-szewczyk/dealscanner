@@ -135,3 +135,26 @@ def test_scrape_one_tags_restaurant_not_dropped(monkeypatch, conn):
     r = scrape.scrape_one("B", "https://b.com/listings", conn, _Client(card), excl)
     assert r["inserted"] == 1 and r["tagged"] == 1            # stored, not dropped
     assert conn.execute("SELECT excludable_tags FROM listings").fetchone()[0] == "Restaurant_Food"
+
+
+# ---- least-recently-scraped ordering (fair rotation under a spend cap) ----
+
+def test_live_brokers_orders_never_scraped_first_then_oldest(conn):
+    for n in ("Alpha", "Bravo", "Charlie"):
+        conn.execute("INSERT INTO broker_sources(name, url, status) VALUES (?,?, 'live')",
+                     (n, f"https://{n.lower()}.com/listings"))
+    # Bravo scraped recently, Charlie scraped long ago, Alpha never scraped.
+    conn.execute("INSERT INTO broker_stats(broker, created_at) VALUES ('Bravo', '2026-06-25T10:00:00')")
+    conn.execute("INSERT INTO broker_stats(broker, created_at) VALUES ('Charlie', '2026-06-01T10:00:00')")
+    conn.commit()
+    order = [name for name, _ in scrape.live_brokers(conn)]
+    # never-scraped first, then oldest-scraped, most-recent last
+    assert order == ["Alpha", "Charlie", "Bravo"]
+
+
+def test_live_brokers_excludes_dead_and_empty_url(conn):
+    conn.execute("INSERT INTO broker_sources(name, url, status) VALUES ('Live','https://x.com/','live')")
+    conn.execute("INSERT INTO broker_sources(name, url, status) VALUES ('Dead','https://y.com/','dead')")
+    conn.execute("INSERT INTO broker_sources(name, url, status) VALUES ('NoUrl','','live')")
+    conn.commit()
+    assert [n for n, _ in scrape.live_brokers(conn)] == ["Live"]

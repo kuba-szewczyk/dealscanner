@@ -295,10 +295,19 @@ def scrape_broker(slug: str, max_usd: float = 0.25, max_pages: int = MAX_PAGES) 
 
 
 def live_brokers(conn) -> list[tuple[str, str]]:
-    """Station 1: the LIVE broker set the scraper crawls = broker_sources(status='live')."""
+    """Station 1: the LIVE broker set the scraper crawls = broker_sources(status='live').
+
+    Ordered least-recently-scraped first (brokers never scraped come first), so if a
+    per-run spend cap truncates the batch, the UNSCRAPED tail is picked up on the next
+    run instead of the same alphabetical tail being starved every day. This lets the
+    daily cap stay modest while still covering every broker over a rolling window.
+    """
     return [(r["name"], r["url"]) for r in conn.execute(
-        "SELECT name, url FROM broker_sources WHERE status='live' AND url IS NOT NULL "
-        "AND url != '' ORDER BY name").fetchall()]
+        "SELECT s.name, s.url FROM broker_sources s "
+        "LEFT JOIN (SELECT broker, MAX(created_at) last_at FROM broker_stats GROUP BY broker) b "
+        "  ON b.broker = s.name "
+        "WHERE s.status='live' AND s.url IS NOT NULL AND s.url != '' "
+        "ORDER BY b.last_at IS NOT NULL, b.last_at, s.name").fetchall()]
 
 
 def _record_error(conn, name: str, msg: str) -> None:

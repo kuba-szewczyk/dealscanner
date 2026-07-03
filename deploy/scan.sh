@@ -9,7 +9,7 @@ DSV2=engine/.venv/bin/dsv2
 # Production flow (from the recovered v2.5 cron): scrape every live broker fresh,
 # enrich newly-qualifying deals with financials, then email the per-thesis digest.
 # Both AI stages are spend-capped; caps are reviewed in deploy/README.md.
-$DSV2 scrape-all --fresh --max-usd "${SCRAPE_MAX_USD:-5.00}"
+$DSV2 scrape-all --fresh --max-usd "${SCRAPE_MAX_USD:-8.00}"
 $DSV2 enrich --max-usd "${ENRICH_MAX_USD:-3.00}"
 $DSV2 notify
 
