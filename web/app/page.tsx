@@ -44,7 +44,8 @@ export default function Board() {
   const [loading, setLoading] = useState(true);
   const [voted, setVoted] = useState<Record<number, string>>({});
   const [voteFilter, setVoteFilter] = useState("all");   // all | voted | unvoted
-  const [period, setPeriod] = useState("all");           // all | 24h | 7d | 30d | custom
+  const [period, setPeriod] = useState("24h");           // all | 24h | 7d | 30d | custom
+  const [signedIn, setSignedIn] = useState(false);       // gate the vote UI on auth
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
   const [nonqual, setNonqual] = useState<any[]>([]);     // out / too_small / excluded
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({}); // per-category fold (default collapsed)
@@ -57,6 +58,7 @@ export default function Board() {
     if (w && ["24h", "7d", "30d"].includes(w)) setPeriod(w);
     const t = q.get("thesis");
     if (t && ["water", "healthcare"].includes(t)) setThesis(t);
+    api.me().then((d) => setSignedIn(!!d.email)).catch(() => setSignedIn(false));
   }, []);
 
   useEffect(() => {
@@ -130,11 +132,13 @@ export default function Board() {
             ))}
           </div>
           <div className="filterbar">
-            <select className="votedrop" aria-label="Vote filter" value={voteFilter} onChange={(e) => setVoteFilter(e.target.value)}>
-              <option value="all">All deals</option>
-              <option value="voted">Voted</option>
-              <option value="unvoted">Not voted</option>
-            </select>
+            {signedIn && (
+              <select className="votedrop" aria-label="Vote filter" value={voteFilter} onChange={(e) => setVoteFilter(e.target.value)}>
+                <option value="all">All deals</option>
+                <option value="voted">Voted</option>
+                <option value="unvoted">Not voted</option>
+              </select>
+            )}
             <div className="seg" role="group" aria-label="Scraped window">
               {[["all", "All time"], ["24h", "24h"], ["7d", "7d"], ["30d", "30d"]].map(([k, lbl]) => (
                 <button key={k} aria-pressed={period === k} onClick={() => setPeriod(k)}>{lbl}</button>
@@ -198,11 +202,13 @@ export default function Board() {
                 <div className="fin"><span>Ask</span><b>{fmtM(d.asking_price)}</b></div>
                 <div className="fin"><span>Mult</span><b>{d.multiple ? `${d.multiple}x` : "—"}</b></div>
               </div>
-              <div className="votecol">
-                {["yes", "maybe", "no"].map((v) => (
-                  <button key={v} className={`${v} ${voted[d.id] === v ? "on" : ""}`} onClick={() => cast(d, v)}>{v}</button>
-                ))}
-              </div>
+              {signedIn && (
+                <div className="votecol">
+                  {["yes", "maybe", "no"].map((v) => (
+                    <button key={v} className={`${v} ${voted[d.id] === v ? "on" : ""}`} onClick={() => cast(d, v)}>{v}</button>
+                  ))}
+                </div>
+              )}
             </article>
           ))}
         </section>

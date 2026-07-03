@@ -30,12 +30,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="nav">
               <Link href="/">Deals</Link>
               <Link href="/search">Search</Link>
-              <Link href="/settings">Thesis setup</Link>
-              <Link href="/brokers">Brokers</Link>
-              <Link href="/activity">Database</Link>
-              <Link href="/logs">Activity</Link>
-              <Link href="/votes">Voting</Link>
-              <Link href="/help">How it works</Link>
+              <Link href="/votes">Shortlist</Link>
+              <Link href="/settings">Thesis</Link>
+              <span className="nav-div" aria-hidden />
+              <Link className="nav-util" href="/brokers">Brokers</Link>
+              <Link className="nav-util" href="/spend">Spend</Link>
+              <Link className="nav-util" href="/help">How it works</Link>
+              <Link className="nav-util" href="/build">Build this</Link>
             </nav>
             <AuthNav />
           </div>

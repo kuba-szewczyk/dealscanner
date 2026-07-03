@@ -43,9 +43,12 @@ a { color: inherit; }
 .wordmark b { color: var(--blue); font-weight: 800; }
 .tag-sub { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
 .spacer { flex: 1; }
-.nav { display: flex; gap: 4px; }
+.nav { display: flex; gap: 4px; align-items: center; }
 .nav a { font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; padding: 7px 11px; border-radius: 7px; white-space: nowrap; }
 .nav a:hover { color: var(--ink); background: var(--blue-soft); }
+.nav a.nav-util { font-size: 12px; font-weight: 500; color: var(--faint); padding: 7px 9px; }
+.nav a.nav-util:hover { color: var(--ink); }
+.nav-div { width: 1px; align-self: stretch; margin: 6px 6px; background: var(--line); }
 .signin { font-weight: 600; font-size: 13px; color: #fff; background: var(--blue); padding: 8px 16px; border-radius: 8px; text-decoration: none; margin-left: 12px; }
 .whoami { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); margin-left: 12px; font-weight: 500; }
 .whoami button { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; cursor: pointer; color: var(--muted); padding: 4px 9px; font-size: 12px; }
@@ -110,6 +113,19 @@ a { color: inherit; }
 .dbtable b.pos { color: #15803d; }
 .dbtable b.muted { color: var(--muted); font-weight: 600; }
 .dbname { font-weight: 600; margin-right: 8px; }
+
+/* sortable headers */
+.dbtable th.sorth { cursor: pointer; user-select: none; white-space: nowrap; }
+.dbtable th.sorth:hover { color: var(--ink); }
+.dbtable th.sorth.on { color: var(--blue); }
+.dbtable th .arrow { font-size: 9px; }
+/* capped single-line cells: name/broker/location never wrap; long values scroll in-cell */
+.capcell { display: block; white-space: nowrap; overflow-x: auto; overflow-y: hidden; }
+.capcell.wide { max-width: 300px; font-weight: 600; }
+.capcell.narrow { max-width: 150px; }
+.capcell::-webkit-scrollbar { height: 4px; }
+.capcell::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+.dbtable td.nowrap, .dbtable .nowrap { white-space: nowrap; }
 .extag { display: inline-block; font-size: 11px; font-weight: 600; color: #92400e; background: #fef3c7; border-radius: 5px; padding: 1px 6px; margin-left: 6px; }
 .pill { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; text-transform: capitalize; }
 .pill.new { background: #dcfce7; color: #15803d; }
