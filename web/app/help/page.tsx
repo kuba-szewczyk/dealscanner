@@ -1,46 +1,88 @@
+export const metadata = { title: "How it works — DealScanner" };
+
+const STEPS = [
+  { n: 1, t: "Brokers", d: "A curated list of 236 business-for-sale brokers is the raw supply. You manage it on the Brokers page — add, archive, or fix a source." },
+  { n: 2, t: "Daily scrape", d: "Every morning the engine visits each live broker, reads the new listings, and stores them once (deduped by URL) with their full text and financials." },
+  { n: 3, t: "Thesis filter", d: "Your thesis — keywords, size band, geography, exclusions — decides what qualifies. A cheap global filter drops the obvious misses (salons, restaurants) before any AI runs." },
+  { n: 4, t: "AI scoring", d: "Where wording is fuzzy, a cheap model reads the listing and judges fit, with a reason. Answers are cached, so the same listing is never paid for twice." },
+  { n: 5, t: "Morning briefing", d: "You get one email: the new deals that cleared your thesis in the last 24 hours, linked straight to the board. That email is also the engine's heartbeat." },
+  { n: 6, t: "You act", d: "Open the Deals board, skim the qualifying deals, and shortlist the ones worth a call. Everything older is a keyword away on Search." },
+];
+
 export default function Help() {
   return (
-    <main className="wrap" style={{ maxWidth: 760 }}>
-      <h1 className="h1">How the desk works</h1>
-      <p className="note" style={{ marginBottom: 24 }}>
-        DealScanner is one engine that any investor can point at their own thesis. Two operators
-        run on it today — water/wastewater and healthcare — from the same shared database.
+    <main className="wrap">
+      <h1 className="h1">How it works</h1>
+      <p className="sub" style={{ maxWidth: "none", marginBottom: 22 }}>
+        DealScanner turns 236 scattered broker websites into one short morning briefing of businesses worth buying —
+        filtered to your investment thesis. Here is the whole pipeline, end to end.
       </p>
 
-      <div className="panel" style={{ marginBottom: 14 }}>
-        <h2 className="display" style={{ fontSize: 16, margin: "0 0 6px" }}>1 · The database is the brain</h2>
-        <p className="note">
-          Every listing is scraped once and stored thesis-neutrally — its full text and raw signals.
-          A listing is never stored twice: the URL is a hard unique key, so the duplicate pile-ups
-          that plagued the old version can&apos;t happen.
-        </p>
+      {/* pipeline */}
+      <div className="pipeline">
+        {STEPS.map((s, i) => (
+          <div key={s.n} className="pstep">
+            <div className="pnum">{s.n}</div>
+            <div className="pbody"><b>{s.t}</b><span>{s.d}</span></div>
+            {i < STEPS.length - 1 && <div className="parrow" aria-hidden>→</div>}
+          </div>
+        ))}
       </div>
 
-      <div className="panel" style={{ marginBottom: 14 }}>
-        <h2 className="display" style={{ fontSize: 16, margin: "0 0 6px" }}>2 · Your settings are the lens</h2>
-        <p className="note">
-          A cheap global filter drops the obvious non-targets — restaurants, salons — before any AI
-          runs. After that, your own thesis (keywords, size band, geography, flags) decides what
-          surfaces. Edit it in Thesis setup and the board re-ranks instantly, for free, because it&apos;s
-          just re-reading data that&apos;s already there.
-        </p>
+      {/* funnel */}
+      <div className="hrow">
+        <div className="panel hcard">
+          <h2 className="hh2">From noise to a shortlist</h2>
+          <p className="note">Most listings are not for you. Each stage narrows the pile so you only ever read the deals that fit — the rest stay searchable but out of your way.</p>
+          <div className="funnel">
+            {[
+              { w: 100, l: "236 brokers scanned", c: "var(--blue)" },
+              { w: 82, l: "Thousands of listings stored", c: "#3b82f6" },
+              { w: 55, l: "Global filter drops obvious misses", c: "#60a5fa" },
+              { w: 30, l: "Your thesis: keywords · size · geography", c: "#38bdf8" },
+              { w: 14, l: "A handful qualify each day", c: "var(--good)" },
+            ].map((r, i) => (
+              <div key={i} className="frow">
+                <div className="fbar" style={{ width: `${r.w}%`, background: r.c }} />
+                <span className="flabel">{r.l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* directional learning chart */}
+        <div className="panel hcard">
+          <h2 className="hh2">Coming soon: your votes sharpen it</h2>
+          <p className="note">
+            Today a deal either clears the thesis or it doesn&apos;t — a binary keyword-and-size gate. Every
+            <b> yes / maybe / no</b> you cast is saved with the deal&apos;s full context. That becomes the training
+            set for an <b>instinct model</b> that learns the judgment calls behind your votes — ranking deals the way
+            you would, not just matching words.
+          </p>
+          <svg viewBox="0 0 300 130" className="learnchart" role="img" aria-label="Directional chart: relevance improves as votes accumulate">
+            <line x1="34" y1="10" x2="34" y2="108" stroke="var(--line)" />
+            <line x1="34" y1="108" x2="292" y2="108" stroke="var(--line)" />
+            {/* binary gate: flat */}
+            <path d="M34,74 L292,74" fill="none" stroke="var(--faint)" strokeWidth="2" strokeDasharray="4 4" />
+            {/* instinct: rising */}
+            <path d="M34,88 C110,84 170,50 292,22" fill="none" stroke="var(--good)" strokeWidth="2.5" />
+            <text x="40" y="24" className="lc-t" fill="var(--good)">instinct model (learns)</text>
+            <text x="150" y="68" className="lc-t" fill="var(--faint)">binary gate (fixed)</text>
+            <text x="150" y="124" className="lc-ax">votes collected →</text>
+            <text x="10" y="60" className="lc-ax" transform="rotate(-90 10 60)">match quality →</text>
+          </svg>
+        </div>
       </div>
 
-      <div className="panel" style={{ marginBottom: 14 }}>
-        <h2 className="display" style={{ fontSize: 16, margin: "0 0 6px" }}>3 · AI where it earns its keep</h2>
-        <p className="note">
-          Keyword matching is literal and instant. When wording is fuzzy — a &quot;specialty
-          contractor&quot; that might be a water business — an optional AI re-judge reads the listing
-          and decides, with a reason. Its answers are cached, so you never pay twice for the same call.
+      <div className="panel" style={{ marginTop: 16 }}>
+        <h2 className="hh2">Two principles that keep it cheap and honest</h2>
+        <p className="note" style={{ marginBottom: 8 }}>
+          <b>The database is the brain.</b> Every listing is stored once, thesis-neutrally. Your settings are a lens
+          applied when you read — so changing a keyword re-ranks the whole board instantly and for free, with no re-scrape.
         </p>
-      </div>
-
-      <div className="panel">
-        <h2 className="display" style={{ fontSize: 16, margin: "0 0 6px" }}>4 · Your votes teach it</h2>
-        <p className="note">
-          Every yes / maybe / no is saved with the full context of the deal at that moment. That&apos;s
-          the groundwork for an instinct model that will one day score the way you would — not yet
-          built, but collecting from the first vote.
+        <p className="note" style={{ margin: 0 }}>
+          <b>Spend is capped and visible.</b> Only the cheapest model is used, every AI call is metered against a daily
+          cap, and the <a href="/spend">Spend</a> page shows exactly what each day cost versus what it found.
         </p>
       </div>
     </main>

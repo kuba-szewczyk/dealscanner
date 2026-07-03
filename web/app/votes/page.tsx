@@ -1,12 +1,24 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, safeHref } from "@/lib/api";
 
 const ORDER = ["yes", "maybe", "no"];
 const TITLE: Record<string, string> = { yes: "Yes — chase it", maybe: "Maybe — worth a look", no: "No — pass" };
+const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
+const PERIODS: [string, string][] = [["all", "All time"], ["24h", "24h"], ["7d", "7d"], ["30d", "30d"]];
 
-export default function Voting() {
+function withinWindow(iso: string, period: string): boolean {
+  if (period === "all") return true;
+  const t = Date.parse(iso);
+  if (isNaN(t)) return true;
+  const days = period === "24h" ? 1 : period === "7d" ? 7 : 30;
+  return t >= Date.now() - days * 864e5;
+}
+
+export default function Shortlist() {
   const [d, setD] = useState<any>(null);
+  const [thesis, setThesis] = useState("water");
+  const [period, setPeriod] = useState("all");
   const [drag, setDrag] = useState<any>(null);
   const [over, setOver] = useState<string | null>(null);
   function load() { api.votesList().then(setD); }
@@ -21,19 +33,39 @@ export default function Voting() {
     if (code === 200) load();
   }
 
+  const votes = useMemo(
+    () => (d?.votes || []).filter((x: any) => x.thesis === thesis && withinWindow(x.created_at, period)),
+    [d, thesis, period]);
+
   return (
-    <main className="wrap" style={{ maxWidth: 820 }}>
-      <h1 className="h1">Voting</h1>
-      <p className="sub" style={{ marginBottom: 16 }}>
-        Every verdict you and Alex cast, captured with the full deal context at vote time. Drag a deal between
-        sections to re-categorize it — this is the record the future instinct model will learn from.
-      </p>
+    <main className="wrap">
+      <div className="boardhead">
+        <h1 className="h1">Shortlist</h1>
+        <p className="sub" style={{ maxWidth: "none" }}>
+          Every verdict cast on {LABEL[thesis]} deals, captured with the full deal context at vote time. Drag a deal
+          between sections to re-categorize it — this is the record the future instinct model will learn from.
+        </p>
+        <div className="filterbar">
+          <div className="lens" role="group" aria-label="Thesis">
+            {["water", "healthcare"].map((t) => (
+              <button key={t} className={t} aria-pressed={thesis === t} onClick={() => setThesis(t)}>
+                <span className="dot" />{LABEL[t]}
+              </button>
+            ))}
+          </div>
+          <div className="seg" role="group" aria-label="Time window">
+            {PERIODS.map(([k, lbl]) => (
+              <button key={k} aria-pressed={period === k} onClick={() => setPeriod(k)}>{lbl}</button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {d && (
         <>
-          <div className="bigstat"><b>{d.total}</b><span>deals voted so far</span></div>
+          <div className="bigstat"><b>{votes.length}</b><span>{LABEL[thesis]} deals voted{period === "all" ? "" : " in window"}</span></div>
           {ORDER.map((v) => {
-            const items = (d.votes || []).filter((x: any) => x.verdict === v);
+            const items = votes.filter((x: any) => x.verdict === v);
             return (
               <div key={v} style={{ marginBottom: 22 }}>
                 <h2 style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 8px", fontSize: 15, fontWeight: 700 }}>
@@ -51,7 +83,6 @@ export default function Voting() {
                       onDragStart={() => setDrag({ listing_id: x.listing_id, thesis: x.thesis, verdict: v })}
                       onDragEnd={() => setOver(null)}>
                       <span style={{ color: "var(--faint)", letterSpacing: "-2px", fontSize: 14 }}>⋮⋮</span>
-                      <span className="vchip" style={{ background: "var(--blue-soft)", color: "var(--blue-ink)" }}>{x.thesis}</span>
                       <span className="vname">
                         {x.listing_url ? <a draggable={false} href={safeHref(x.listing_url)} target="_blank" rel="noreferrer">{x.business_name}</a> : x.business_name}
                       </span>
