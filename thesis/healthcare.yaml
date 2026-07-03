@@ -1,76 +1,94 @@
-# Healthcare thesis (Kuba's search fund). Lighter second thesis — proves the engine
-# is thesis-agnostic. Seed default for the 'healthcare' account; editable after.
+# Healthcare thesis — CONCIERGE MEDICINE in large, high-wealth metros.
+# Deliberately selective: concierge / direct-primary-care / membership / executive-health
+# practices only, and (geo.require) only in top wealth metros. This narrows hard on purpose.
+# Seed default for the 'healthcare' account; editable live in the DB after seeding.
 slug: healthcare
-name: "Healthcare Services"
+name: "Concierge Medicine"
 owner_email: null
 
 size:
-  ebitda_min: 1000000
-  ebitda_max: 5000000
-  sde_min: 1500000
-  reject_below_ask: 1000000
+  ebitda_min: 500000
+  ebitda_max: 6000000
+  sde_min: 750000
+  reject_below_ask: 750000
 
 keywords:
+  # A single tier-1 hit = a concierge / membership / executive-health practice.
   tier1:
-    - home health
-    - home care
-    - hospice
-    - dental practice
-    - dental group
-    - dso
+    - concierge medicine
+    - concierge physician
+    - concierge doctor
+    - concierge practice
+    - concierge primary care
+    - concierge family medicine
+    - concierge internal medicine
+    - direct primary care
+    - dpc practice
+    - membership medicine
+    - membership-based practice
+    - membership medical practice
+    - retainer medicine
+    - retainer-based practice
+    - boutique medical practice
+    - boutique primary care
+    - boutique family practice
+    - executive health
+    - executive physical
+    - executive medicine
+    - executive wellness
+    - longevity clinic
+    - longevity medicine
+    - precision health
+    - private physician practice
+    - personalized primary care
+    - personalized medicine
+    - vip medical
+    - medical concierge
+  # Tier-2 counts ONLY with a concierge/membership context word — catches practices
+  # that are membership-based without using the exact phrase "concierge medicine".
+  tier2:
+    - primary care
+    - family medicine
+    - internal medicine
+    - general practice
     - medical practice
     - physician practice
-    - urgent care
-    - behavioral health
-    - mental health
-    - physical therapy
-    - occupational therapy
-    - outpatient
-    - ambulatory surgery
-    - medical billing
-    - revenue cycle management
-    - durable medical equipment
-    - medical device
-    - pharmacy
-    - veterinary
-    - veterinary practice
-    - dialysis
-    - imaging center
-    - diagnostic lab
-    - clinical lab
-    - skilled nursing
-    - assisted living
-    - healthcare staffing
-    - medical staffing
-  tier2:
-    - clinic
-    - practice
-    - services
-    - staffing
-    - billing
-    - care
-    - therapy
-    - rehabilitation
-    - wellness
+    - wellness clinic
+    - med practice
   context:
-    - health
-    - medical
-    - patient
-    - clinical
-    - care
-    - dental
-    - physician
-    - nursing
+    - concierge
+    - membership
+    - retainer
+    - boutique
+    - executive
+    - longevity
+    - private
+    - personalized
+    - subscription
+    - vip
   negative:
-    - medical spa
+    - urgent care
+    - hospital
     - med spa
+    - medical spa
     - weight loss
-    - tanning
-    - cosmetic
+    - dialysis
+    - hospice
+    - home health
+    - nursing home
+    - skilled nursing
+    - franchise
+    - chiropractic
 
 geo:
-  tier1_metros: [charlotte, raleigh, durham, raleigh-durham, washington dc, atlanta, nashville]
-  tier2_states: [NC, SC, GA, VA, MD, DC, TN, FL, TX]
+  # require: qualify ONLY in a target metro/state. Off-metro and unplaceable deals are
+  # held out of the board (section 'off_geo') — they feed the detail-screening queue.
+  require: true
+  tier1_metros: [new york, manhattan, brooklyn, los angeles, san francisco, san jose,
+    palo alto, beverly hills, santa monica, newport beach, boston, cambridge, miami,
+    miami beach, palm beach, naples, chicago, seattle, washington dc, greenwich,
+    scottsdale, austin, dallas, houston, denver, aspen]
+  tier2_states: [NY, CA, MA, FL, IL, DC, WA, CT, CO, AZ, TX, NJ]
 
 categories:
   exclude: []

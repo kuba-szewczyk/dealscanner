@@ -150,3 +150,38 @@ def test_migrate_normalizes_legacy_dates_to_iso():
     db.migrate(conn)
     row = conn.execute("SELECT first_seen, last_seen FROM listings").fetchone()
     assert row["first_seen"] == "2026-06-17" and row["last_seen"] == "2026-06-17"
+
+
+# ---- optional geo gate (concierge / rich-metro theses) ----
+
+def _geo_settings(require):
+    return {
+        "keywords": {"tier1": ["concierge medicine"], "context": [], "tier2": [], "negative": []},
+        "size": {}, "flags": {"positive": [], "negative": []},
+        "geo": {"require": require, "tier1_metros": ["new york", "miami"], "tier2_states": ["CA", "MA"]},
+    }
+
+def _listing(state, city="", ft=""):
+    return {"business_name": "A concierge medicine practice", "state": state, "city": city, "full_text": ft}
+
+def test_geo_gate_off_qualifies_anywhere():
+    v = evaluator.evaluate(_listing("OH"), _geo_settings(False))
+    assert v["section"] == "in"
+
+def test_geo_gate_on_allows_target_state_fullname():
+    v = evaluator.evaluate(_listing("California"), _geo_settings(True))  # normalized to CA
+    assert v["section"] == "in"
+
+def test_geo_gate_on_allows_metro_in_text():
+    v = evaluator.evaluate(_listing("", city="Miami"), _geo_settings(True))
+    assert v["section"] == "in"
+
+def test_geo_gate_on_holds_out_offgeo_and_unknown():
+    assert evaluator.evaluate(_listing("OH"), _geo_settings(True))["section"] == "off_geo"
+    assert evaluator.evaluate(_listing(""), _geo_settings(True))["section"] == "off_geo"
+
+def test_norm_state():
+    assert evaluator._norm_state("California") == "CA"
+    assert evaluator._norm_state("ca") == "CA"
+    assert evaluator._norm_state("NY") == "NY"
+    assert evaluator._norm_state("Remote") == ""

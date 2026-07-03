@@ -79,6 +79,38 @@ def _kw_relevance(text: str, kw: dict) -> tuple[int, list[str]]:
     return rel, (tier1 + tier2)[:5]
 
 
+_STATE_ABBR = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA",
+    "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA",
+    "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
+    "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
+    "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS",
+    "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV", "new hampshire": "NH",
+    "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC",
+    "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA",
+    "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", "tennessee": "TN",
+    "texas": "TX", "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA",
+    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC",
+}
+
+
+def _norm_state(s: Optional[str]) -> str:
+    """Normalize a state field to a 2-letter code. Handles 'CA', 'California', 'ca'."""
+    s = (s or "").strip()
+    if len(s) == 2:
+        return s.upper()
+    return _STATE_ABBR.get(s.lower(), "")
+
+
+def _geo_match(listing: dict, geo: dict) -> bool:
+    """True if the listing is in one of the thesis's target metros or states."""
+    metros = [m.lower() for m in geo.get("tier1_metros", [])]
+    hay = f"{(listing.get('city') or '').lower()} {(listing.get('full_text') or '').lower()}"
+    if any(m in hay for m in metros):
+        return True
+    return _norm_state(listing.get("state")) in set(geo.get("tier2_states", []))
+
+
 def _size_ok(l: dict, size: dict) -> bool:
     ask, rev, eb, sde = l.get("asking_price"), l.get("revenue"), l.get("ebitda"), l.get("sde")
     floor = size.get("reject_below_ask", 1_000_000)
@@ -105,7 +137,7 @@ def _flags(l: dict, settings: dict) -> tuple[list[str], list[str], int]:
     metros = [m.lower() for m in geo.get("tier1_metros", [])]
     if any(m in f"{(l.get('city') or '').lower()} {(l.get('full_text') or '').lower()}" for m in metros):
         pos.append("geo_t1")
-    if (l.get("state") or "") in geo.get("tier2_states", []):
+    if _norm_state(l.get("state")) in geo.get("tier2_states", []):
         pos.append("geo_t2")
     th = settings.get("thresholds", {})
     margin = l.get("ebitda_margin_pct")
@@ -192,7 +224,14 @@ def evaluate(listing: dict, settings: dict, today: Optional[str] = None) -> dict
     elif not _size_ok(listing, settings.get("size", {})):
         section = "too_small"
     elif relevance >= 2:
-        section = "in"
+        # Optional geo gate: when geo.require is on, a keyword+size match still only
+        # qualifies if it is in a target metro/state. Off-geo (and unplaceable) deals
+        # are held out of the board — they are the queue the detail-screening pass works.
+        geo = settings.get("geo", {})
+        if geo.get("require") and not _geo_match(listing, geo):
+            section = "off_geo"
+        else:
+            section = "in"
     else:
         section = "out"
 
