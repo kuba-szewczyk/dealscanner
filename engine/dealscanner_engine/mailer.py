@@ -1,84 +1,55 @@
-"""Outbound email for v3: Resend HTTP API first, Gmail SMTP app-password fallback.
+"""One place to send email, with a pluggable backend so delivery is reliable and not
+tied to a personal inbox.
 
-Deliberately stdlib-only (urllib + smtplib) — v2's Google-OAuth Gmail sender broke
-three times (token expiry/revocation); app passwords and API keys don't. Config via
-env / repo-root .env:
-
-  RESEND_API_KEY      primary sender (api.resend.com)
-  MAIL_FROM           from-address for Resend (must be a verified domain/sender)
-  GMAIL_ADDRESS       fallback: Gmail account
-  GMAIL_APP_PASSWORD  fallback: app password (myaccount.google.com/apppasswords)
+Picks the backend from env (no code change to switch):
+  * RESEND_API_KEY set  -> Resend transactional API, from MAIL_FROM (e.g. deals@dealscanner.us).
+                           Reliable, domain-authenticated, off the personal inbox. RECOMMENDED.
+  * else                -> Gmail SMTP + App Password (GMAIL_ADDRESS / GMAIL_APP_PASSWORD).
+                           Works out of the box but uses a personal Gmail.
 """
 from __future__ import annotations
 
 import json
 import os
 import smtplib
+import ssl
 import urllib.error
 import urllib.request
 from email.mime.text import MIMEText
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
-
-# Resend's Cloudflare returns 403 "error code: 1010" if no User-Agent is sent.
-_UA = "dealscanner-v3-mailer/1.0"
 
 
-class MailError(RuntimeError):
-    pass
+def send_email(recipients: list[str], subject: str, html: str) -> str:
+    """Send an HTML email. Returns the backend used. Raises on failure."""
+    if os.getenv("RESEND_API_KEY"):
+        _send_resend(recipients, subject, html)
+        return "resend"
+    _send_gmail(recipients, subject, html)
+    return "gmail"
 
 
-def _send_resend(to: list[str], subject: str, text: str) -> None:
-    payload = {
-        "from": os.environ.get("MAIL_FROM") or os.environ["GMAIL_ADDRESS"],
-        "to": to,
-        "subject": subject,
-        "text": text,
-    }
+def _send_resend(recipients: list[str], subject: str, html: str) -> None:
+    key = os.environ["RESEND_API_KEY"]
+    sender = os.getenv("MAIL_FROM", "DealScanner <deals@dealscanner.us>")
+    payload = json.dumps({"from": sender, "to": recipients, "subject": subject, "html": html}).encode()
     req = urllib.request.Request(
-        "https://api.resend.com/emails",
-        data=json.dumps(payload).encode(),
-        headers={
-            "Authorization": f"Bearer {os.environ['RESEND_API_KEY']}",
-            "Content-Type": "application/json",
-            "User-Agent": _UA,
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        if resp.status >= 300:
-            raise MailError(f"resend HTTP {resp.status}")
+        "https://api.resend.com/emails", data=payload,
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                 "User-Agent": "DealScanner-mailer/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            r.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Resend {e.code}: {e.read().decode()[:300]}") from None
 
 
-def _send_gmail_smtp(to: list[str], subject: str, text: str) -> None:
-    addr = os.environ["GMAIL_ADDRESS"]
-    msg = MIMEText(text, "plain")
-    msg["From"] = addr
-    msg["To"] = ", ".join(to)
-    msg["Subject"] = subject
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
-        s.login(addr, os.environ["GMAIL_APP_PASSWORD"])
-        s.sendmail(addr, to, msg.as_string())
-
-
-def send(to: str | list[str], subject: str, text: str) -> str:
-    """Send via Resend, falling back to Gmail SMTP. Returns the method used."""
-    recipients = [to] if isinstance(to, str) else list(to)
-    errors = []
-    if os.environ.get("RESEND_API_KEY"):
-        try:
-            _send_resend(recipients, subject, text)
-            return "resend"
-        except (urllib.error.URLError, KeyError, MailError, OSError) as e:
-            errors.append(f"resend: {e}")
-    if os.environ.get("GMAIL_ADDRESS") and os.environ.get("GMAIL_APP_PASSWORD"):
-        try:
-            _send_gmail_smtp(recipients, subject, text)
-            return "gmail-smtp"
-        except (smtplib.SMTPException, OSError) as e:
-            errors.append(f"gmail-smtp: {e}")
-    raise MailError("all mail methods failed or unconfigured: " + ("; ".join(errors) or
-                    "set RESEND_API_KEY or GMAIL_ADDRESS+GMAIL_APP_PASSWORD"))
+def _send_gmail(recipients: list[str], subject: str, html: str) -> None:
+    sender = os.environ["GMAIL_ADDRESS"]
+    pw = os.environ["GMAIL_APP_PASSWORD"]
+    msg = MIMEText(html, "html")
+    msg["from"] = sender
+    msg["to"] = ", ".join(recipients)
+    msg["subject"] = subject
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
+        smtp.starttls(context=ssl.create_default_context())
+        smtp.login(sender, pw)
+        smtp.send_message(msg)

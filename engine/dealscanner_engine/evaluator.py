@@ -7,28 +7,76 @@ no LLM call and no re-scrape. (The optional AI re-judge is a separate, cached pa
 """
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Optional
 
 
-def _kw_relevance(text: str, kw: dict) -> tuple[int, list[str]]:
-    """Port of v1 water decision logic, generalized over any keyword set.
-    Tier1 single match = relevant; Tier2 needs a context word; negatives cap at 3."""
+def _parse_day(s: Optional[str]) -> Optional[date]:
+    """Accept ISO 'YYYY-MM-DD' (with or without time) and v1 'M/D/YYYY'."""
+    if not s:
+        return None
+    s = s.strip()[:10] if "T" not in s else s.split("T", 1)[0]
+    try:
+        return date.fromisoformat(s)
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(s, "%m/%d/%Y").date()
+    except ValueError:
+        return None
+
+
+def match_exclusion_tags(text: str, exclusions: dict[str, list[str]]) -> list[str]:
+    """Station 3: tag (don't drop). Return the global non-target CATEGORY names whose
+    keywords appear in the listing text, so each thesis can decide whether to hide them."""
     t = (text or "").lower()
-    matched: list[str] = []
+    return sorted(cat for cat, kws in exclusions.items()
+                  if any(kw.lower() in t for kw in kws))
+
+
+def classify_staleness(first_seen: Optional[str], last_seen: Optional[str],
+                       today: Optional[str] = None, stale_days: int = 30) -> str:
+    """new = first discovered today · active = seen within stale_days · stale = older.
+    A re-found old listing reads 'active', never 'new' (first_seen is sticky)."""
+    today = today or date.today().isoformat()
+    td = _parse_day(today)
+    ls = _parse_day(last_seen) or _parse_day(first_seen)
+    if td and ls and (td - ls).days > stale_days:
+        return "stale"
+    if first_seen and _parse_day(first_seen) == td:
+        return "new"
+    return "active"
+
+
+def _kw_relevance(text: str, kw: dict) -> tuple[int, list[str]]:
+    """Graded 1-5 confidence over a keyword set (restores v1's full 1..5 scale).
+
+      5  strong on-thesis: 2+ tier1 hits, or a tier1 hit backed by context
+      4  one tier1 hit (clear industry match, no extra corroboration)
+      3  tier1 but with a negative caveat, OR two+ tier2 hits backed by context
+      2  one tier2 hit backed by context (decent secondary signal)
+      1  a tier2 industry word with NO qualifying context (marginal/keep-an-eye)
+      0  no industry keyword at all
+    """
+    t = (text or "").lower()
     tier1 = [k for k in kw.get("tier1", []) if k.lower() in t]
     context_present = any(c.lower() in t for c in kw.get("context", []))
-    tier2 = [k for k in kw.get("tier2", []) if k.lower() in t] if context_present else []
+    tier2 = [k for k in kw.get("tier2", []) if k.lower() in t]
     negatives = [k for k in kw.get("negative", []) if k.lower() in t]
-    matched = tier1 + tier2
-    if not matched:
+    if not tier1 and not tier2:
         return 0, []
     if tier1:
-        rel = 3 if negatives else 5
-    else:  # tier2 + context only
-        rel = 3
-    if negatives and rel > 3:
-        rel = 3
-    return rel, matched[:5]
+        rel = 5 if (len(tier1) >= 2 or context_present) else 4
+        if negatives:
+            rel = 3
+    else:  # tier2 only
+        if context_present:
+            rel = 3 if len(tier2) >= 2 else 2
+        else:
+            rel = 1
+        if negatives:
+            rel = max(1, rel - 1)
+    return rel, (tier1 + tier2)[:5]
 
 
 def _size_ok(l: dict, size: dict) -> bool:
@@ -40,7 +88,7 @@ def _size_ok(l: dict, size: dict) -> bool:
         return False
     if eb is not None and size.get("ebitda_min", 0) <= eb <= size.get("ebitda_max", 1e12):
         return True
-    if sde is not None and sde >= size.get("sde_min", 1e12):
+    if sde is not None and size.get("sde_min", 1e12) <= sde <= size.get("sde_max", 1e15):
         return True
     if eb is None and sde is None:
         return True  # unknown financials pass the size gate (judged elsewhere)
@@ -59,19 +107,22 @@ def _flags(l: dict, settings: dict) -> tuple[list[str], list[str], int]:
         pos.append("geo_t1")
     if (l.get("state") or "") in geo.get("tier2_states", []):
         pos.append("geo_t2")
+    th = settings.get("thresholds", {})
     margin = l.get("ebitda_margin_pct")
-    if margin is not None and margin > 20:
+    if margin is not None and margin > th.get("margin_good", 20):
         pos.append("margin_gt_20")
     if "retir" in text:
         pos.append("owner_retiring")
     rec = l.get("recurring_pct")
-    if rec is not None and rec >= 40:
+    if rec is not None and rec >= th.get("recurring", 40):
         pos.append("recurring_40")
 
-    if margin is not None and margin < 15:
+    if margin is not None and margin < th.get("margin_low", 15):
         neg.append("low_margin_lt_15")
-    mult = l.get("multiple")
-    if mult is not None and mult > 6:
+    ask, eb_v, sde_v = l.get("asking_price"), l.get("ebitda"), l.get("sde")
+    if ask and eb_v and eb_v > 0 and ask / eb_v > th.get("overprice_ebitda", 6):
+        neg.append("overpriced")
+    elif ask and sde_v and sde_v > 0 and ask / sde_v > th.get("overprice_sde", 5):
         neg.append("overpriced")
     if "franchise" in text:
         neg.append("franchise_resale")
@@ -86,16 +137,58 @@ def _flags(l: dict, settings: dict) -> tuple[list[str], list[str], int]:
     return pos, neg, score
 
 
-def evaluate(listing: dict, settings: dict) -> dict:
+# Quick-exclusion keyword sets toggled from Thesis setup. Kept tight on purpose.
+_EXCL_KW = {
+    "restaurants": ["restaurant", "pizzeria", " cafe", " café", "bistro", "diner", "bakery",
+                    "coffee shop", "food truck", "catering", "brewery", "taqueria", "ice cream",
+                    "juice bar", "sandwich shop", " deli", "donut", "doughnut", "bar & grill",
+                    "bar and grill", "nightclub", "sports bar"],
+    "real_estate": ["real estate", "for lease", "property management", "apartment complex",
+                    "rental property", "land for sale", "commercial property", "office building",
+                    "self storage", "self-storage", "mobile home park", "rv park"],
+    "franchise": ["franchise", "franchisee", "franchisor"],
+}
+
+
+def _excluded(text: str, settings: dict) -> bool:
+    """Thesis-level keyword exclusions for categories NOT covered by global tags
+    (real estate, franchise). Restaurants/consumer junk are handled by excludable_tags."""
+    ex = settings.get("exclusions") or {}
+    t = text.lower()
+    # Both default OFF (real estate also appears in good deals like "practice WITH real estate").
+    for key, on in (("real_estate", ex.get("real_estate", False)),
+                    ("franchise", ex.get("franchise", False))):
+        if on and any(k in t for k in _EXCL_KW[key]):
+            return True
+    return False
+
+
+def _excluded_by_tags(listing: dict, settings: dict) -> bool:
+    """A thesis hides a listing if any of its stored excludable_tags is in the thesis's
+    exclude set. Default (exclude_tags absent) = exclude ALL global non-target tags,
+    preserving today's hide-consumer-junk behavior while keeping the rows in the DB."""
+    tags = [t.strip() for t in (listing.get("excludable_tags") or "").split(",") if t.strip()]
+    if not tags:
+        return False
+    exclude_set = settings.get("exclude_tags")  # None => all
+    return exclude_set is None or any(t in exclude_set for t in tags)
+
+
+def evaluate(listing: dict, settings: dict, today: Optional[str] = None) -> dict:
     """Pure function: (thesis-neutral listing, current settings) -> per-account verdict."""
     kw = settings.get("keywords", {})
     text = " ".join(str(listing.get(f, "") or "") for f in
                      ("business_name", "category", "one_line_take", "full_text"))
     relevance, matched = _kw_relevance(text, kw)
     pos, neg, flag_score = _flags(listing, settings)
+    freshness = classify_staleness(listing.get("first_seen"), listing.get("last_seen"), today)
 
     if listing.get("is_sold"):
         section = "sold"
+    elif _excluded_by_tags(listing, settings) or _excluded(text, settings):
+        section = "excluded"
+    elif freshness == "stale":
+        section = "stale"
     elif not _size_ok(listing, settings.get("size", {})):
         section = "too_small"
     elif relevance >= 2:
@@ -124,6 +217,7 @@ def evaluate(listing: dict, settings: dict) -> dict:
         "positive_flags": pos,
         "negative_flags": neg,
         "flag_score": flag_score,
+        "freshness": freshness,
     }
 
 

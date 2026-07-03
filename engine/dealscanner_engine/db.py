@@ -54,11 +54,15 @@ CREATE TABLE IF NOT EXISTS listings (
     full_text         TEXT,                     -- searchable blob for keyword re-match
     data_completeness TEXT,
     is_sold           INTEGER DEFAULT 0,
+    excludable_tags   TEXT,                     -- global non-target categories matched (comma-sep); tag, don't drop
     content_hash      TEXT,
-    first_seen        TEXT,                     -- date_added
+    first_seen        TEXT,                     -- date first discovered (STICKY = "scraped" date)
+    last_seen         TEXT,                     -- date last seen still listed (bumped on re-find)
+    enriched_at       TEXT,                     -- detail page crawled at most ONCE; NULL = not yet
     scored_at         TEXT                      -- NULL until scored
 );
 CREATE INDEX IF NOT EXISTS idx_listings_first_seen ON listings(first_seen);
+CREATE INDEX IF NOT EXISTS idx_listings_last_seen ON listings(last_seen);
 CREATE INDEX IF NOT EXISTS idx_listings_broker ON listings(broker);
 
 -- Per-account computed relevance/section/score. Recomputable cheaply:
@@ -97,6 +101,8 @@ CREATE TABLE IF NOT EXISTS broker_stats (
     status      TEXT,
     new_count   INTEGER,
     total_count INTEGER,
+    chars_fed   INTEGER,                    -- markdown chars digested (==60000 = at feed limit)
+    pages       INTEGER,                    -- pages crawled (>1 = pagination engaged)
     note        TEXT,
     created_at  TEXT
 );
@@ -131,6 +137,19 @@ CREATE TABLE IF NOT EXISTS logs (
     message    TEXT,
     duration_ms INTEGER
 );
+
+-- Which brokers we keep / archive / have queued. Yield + health are still derived
+-- from listings; this just controls what's live vs archived vs pending.
+CREATE TABLE IF NOT EXISTS broker_sources (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT UNIQUE NOT NULL,
+    url             TEXT,
+    status          TEXT DEFAULT 'live',         -- live | archived | pending
+    block_count     INTEGER DEFAULT 0,           -- times Firecrawl was blocked on this broker's pages
+    last_blocked_at TEXT,                         -- when last blocked (Firecrawl can't load the page)
+    last_block_reason TEXT,
+    created_at      TEXT
+);
 """
 
 
@@ -147,4 +166,81 @@ def init_db(db_path: Path = DB_PATH) -> None:
     conn = connect(db_path)
     conn.executescript(SCHEMA)
     conn.commit()
+    migrate(conn)
     conn.close()
+
+
+# Additive, idempotent migrations for DBs created before a column existed.
+# Safe to run on every startup: ADD COLUMN is a no-op if the column is present.
+_ADD_COLUMNS = {
+    "listings": {
+        "excludable_tags": "TEXT",
+        "last_seen": "TEXT",
+        "enriched_at": "TEXT",
+    },
+    "broker_stats": {
+        "chars_fed": "INTEGER",   # markdown chars actually digested (==60000 means at the feed limit)
+        "pages": "INTEGER",       # pages crawled this scrape (>1 means pagination kicked in)
+    },
+    "broker_sources": {
+        "block_count": "INTEGER DEFAULT 0",   # Firecrawl-blocked pages seen for this broker
+        "last_blocked_at": "TEXT",
+        "last_block_reason": "TEXT",
+    },
+}
+
+
+def record_block(conn: sqlite3.Connection, broker: str, reason: str) -> None:
+    """Leave a persistent broker-level mark when Firecrawl can't load a broker's pages, so a
+    systematically-blocked broker (won't ever scrape) is visible long-term, not silently retried."""
+    if not broker:
+        return
+    import datetime as _dt
+    try:
+        conn.execute(
+            "UPDATE broker_sources SET block_count = COALESCE(block_count,0)+1, "
+            "last_blocked_at = ?, last_block_reason = ? WHERE name = ?",
+            (_dt.datetime.now(_dt.timezone.utc).isoformat(), (reason or "")[:160], broker))
+        conn.commit()
+    except Exception:
+        pass  # a block-mark is a non-critical side-effect; never let it abort the run
+
+
+def _iso(s):
+    """Normalize 'M/D/YYYY' (v1) -> 'YYYY-MM-DD'. Pass ISO through; leave junk alone."""
+    if not s:
+        return s
+    s = s.strip()
+    try:
+        import datetime as _dt
+        if "/" in s:
+            return _dt.datetime.strptime(s[:10], "%m/%d/%Y").date().isoformat()
+    except ValueError:
+        pass
+    return s[:10]
+
+
+def migrate(conn: sqlite3.Connection) -> dict:
+    """Add missing columns, backfill last_seen, normalize mixed date formats to ISO."""
+    added = []
+    tables = {r["name"] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    for table, cols in _ADD_COLUMNS.items():
+        if table not in tables:
+            continue
+        existing = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for col, decl in cols.items():
+            if col not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+                added.append(f"{table}.{col}")
+    # Backfill last_seen for legacy rows (first_seen is the only date they have).
+    conn.execute("UPDATE listings SET last_seen = first_seen WHERE last_seen IS NULL")
+    # Normalize any M/D/YYYY dates to ISO so date comparisons are reliable (idempotent).
+    normalized = 0
+    for r in conn.execute("SELECT id, first_seen, last_seen FROM listings "
+                          "WHERE first_seen LIKE '%/%' OR last_seen LIKE '%/%'").fetchall():
+        conn.execute("UPDATE listings SET first_seen=?, last_seen=? WHERE id=?",
+                     (_iso(r["first_seen"]), _iso(r["last_seen"]), r["id"]))
+        normalized += 1
+    conn.commit()
+    return {"added": added, "dates_normalized": normalized}

@@ -1,7 +1,5 @@
-"""Magic-link auth (passwordless). Hardcoded 2-email allow-list for the week
-(Phase-2 = editable list). Tokens are HMAC-signed + time-limited; the session is a
-longer-lived signed cookie. Email goes through the engine mailer (Resend / Gmail
-SMTP app password — v2's Google-OAuth sender broke 3x and is gone).
+"""Magic-link auth (passwordless). Allow-list comes from env (ALLOW_LIST). Tokens are
+HMAC-signed + time-limited; the session is a longer-lived signed cookie.
 
 Soft gate by design: the board stays public so the demo URL is always shareable;
 login just identifies the operator (vote attribution + 'signed in as')."""
@@ -18,10 +16,13 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
-from dealscanner_engine import mailer
+from dealscanner_engine import config
 
-# Operator allow-list comes from env (comma-separated) so no emails live in code.
-ALLOW_LIST = {e.strip().lower() for e in os.environ.get("ALLOW_LIST", "").split(",") if e.strip()}
+# Env-driven; evaluated per-call so ALLOW_LIST changes don't need a code edit.
+def _allow_list() -> set[str]:
+    return config.allow_list()
+
+ALLOW_LIST = _allow_list()
 
 # Stable secret persisted next to the DB so restarts don't invalidate sessions.
 _SECRET_FILE = Path(__file__).resolve().parents[1] / "data" / ".auth_secret"
@@ -31,6 +32,7 @@ def _secret() -> bytes:
     if not _SECRET_FILE.exists():
         _SECRET_FILE.write_text(secrets.token_hex(32))
     return _SECRET_FILE.read_text().strip().encode()
+
 
 def _sign(payload: dict, ttl: int) -> str:
     body = {**payload, "exp": int(time.time()) + ttl}
@@ -73,7 +75,12 @@ def email_from_session(token: str | None) -> str | None:
     return b["email"] if b and b.get("kind") == "session" else None
 
 
+# ---- Email send via the shared pluggable mailer (Gmail now; Resend when configured) ----
+
 def send_magic_link(to: str, link: str) -> None:
-    body = (f"Hi — here's your sign-in link for the DealScanner desk:\n\n{link}\n\n"
-            "It expires in 15 minutes. If you didn't request this, ignore it.")
-    mailer.send(to, "Your DealScanner sign-in link", body)
+    from dealscanner_engine import mailer
+    html = (f"<p style='font-family:sans-serif'>Hi — here's your sign-in link for the "
+            f"DealScanner desk:</p><p style='font-family:sans-serif'>"
+            f"<a href='{link}'>{link}</a></p><p style='font-family:sans-serif;color:#64748b;"
+            f"font-size:13px'>It expires in 15 minutes. If you didn't request this, ignore it.</p>")
+    mailer.send_email([to], "Your DealScanner sign-in link", html)
