@@ -110,6 +110,19 @@ keywords:
     - car wash
     - fire sprinkler
     - fire suppression
+  # Hard exclude: adjacent industries that mention water terms but aren't water businesses
+  # (a zeolite mineral deposit, oilfield produced-water haulers, etc.).
+  exclude_terms:
+    - zeolite
+    - oilfield
+    - oil & gas
+    - oil and gas
+    - oil field
+    - produced water
+    - mineral deposit
+    - mining claim
+    - mine site
+    - drilling rig
 
 geo:
   tier1_metros: [charlotte, raleigh, durham, raleigh-durham, washington dc, arlington, bethesda, alexandria]

@@ -159,7 +159,7 @@ export default function Board() {
             )}
           </div>
         </div>
-        <div className="cost"><b>{loading ? "…" : filtered.length}</b>{!loading && filtered.length !== deals.length ? ` of ${deals.length}` : ""} qualifying · <b>${spend.toFixed(4)}</b> engine spend</div>
+        <div className="cost"><b>{loading ? "…" : filtered.length}</b>{!loading && filtered.length !== deals.length ? ` of ${deals.length}` : ""} qualifying</div>
       </div>
 
       {loading && <p className="note">Loading deals…</p>}
