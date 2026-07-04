@@ -185,8 +185,14 @@ _EXCL_KW = {
 def _excluded(text: str, settings: dict) -> bool:
     """Thesis-level keyword exclusions for categories NOT covered by global tags
     (real estate, franchise). Restaurants/consumer junk are handled by excludable_tags."""
-    ex = settings.get("exclusions") or {}
     t = text.lower()
+    # Hard-exclude terms: a match forces the listing out of the thesis, regardless of any
+    # keyword hit. Use for adjacent-but-wrong businesses (e.g. dental/vet for a primary-care
+    # thesis) that soft 'negative' keywords only cap rather than remove.
+    hard = settings.get("keywords", {}).get("exclude_terms", [])
+    if hard and any(k.lower() in t for k in hard):
+        return True
+    ex = settings.get("exclusions") or {}
     # Both default OFF (real estate also appears in good deals like "practice WITH real estate").
     for key, on in (("real_estate", ex.get("real_estate", False)),
                     ("franchise", ex.get("franchise", False))):

@@ -1,9 +1,10 @@
-# Healthcare thesis — CONCIERGE MEDICINE in large, high-wealth metros.
-# Deliberately selective: concierge / direct-primary-care / membership / executive-health
-# practices only, and (geo.require) only in top wealth metros. This narrows hard on purpose.
+# Healthcare thesis — PRIMARY CARE CLINICS in large, high-wealth metros.
+# Family medicine / internal medicine / general practice / pediatric / urgent-care /
+# community-health clinics. exclude_terms hard-drops adjacent-but-wrong businesses
+# (dental, vet, optical, imaging, PT, etc.); geo.require focuses on top wealth metros.
 # Seed default for the 'healthcare' account; editable live in the DB after seeding.
 slug: healthcare
-name: "Concierge Medicine"
+name: "Primary Care Clinics"
 owner_email: null
 
 size:
@@ -13,76 +14,91 @@ size:
   reject_below_ask: 750000
 
 keywords:
-  # A single tier-1 hit = a concierge / membership / executive-health practice.
+  # A single tier-1 hit = a primary-care clinic/practice.
   tier1:
-    - concierge medicine
-    - concierge physician
-    - concierge doctor
-    - concierge practice
-    - concierge primary care
-    - concierge family medicine
-    - concierge internal medicine
-    - direct primary care
-    - dpc practice
-    - membership medicine
-    - membership-based practice
-    - membership medical practice
-    - retainer medicine
-    - retainer-based practice
-    - boutique medical practice
-    - boutique primary care
-    - boutique family practice
-    - executive health
-    - executive physical
-    - executive medicine
-    - executive wellness
-    - longevity clinic
-    - longevity medicine
-    - precision health
-    - private physician practice
-    - personalized primary care
-    - personalized medicine
-    - vip medical
-    - medical concierge
-  # Tier-2 counts ONLY with a concierge/membership context word — catches practices
-  # that are membership-based without using the exact phrase "concierge medicine".
-  tier2:
     - primary care
+    - primary care clinic
+    - primary care practice
+    - primary care group
+    - primary care physician
     - family medicine
+    - family practice
+    - family medical
     - internal medicine
     - general practice
-    - medical practice
-    - physician practice
-    - wellness clinic
-    - med practice
-  context:
-    - concierge
-    - membership
-    - retainer
-    - boutique
-    - executive
-    - longevity
-    - private
-    - personalized
-    - subscription
-    - vip
-  negative:
+    - general practitioner
+    - pediatric clinic
+    - pediatric practice
+    - pediatrics practice
+    - pediatric medical
+    - community health center
+    - federally qualified health center
+    - fqhc
     - urgent care
-    - hospital
+    - walk-in clinic
+    - walk in clinic
+    - physician group
+    - medical group
+    - concierge medicine
+    - direct primary care
+    - multispecialty clinic
+    - multi-specialty clinic
+  tier2:
+    - family health
+    - health center
+    - wellness clinic
+    - medical clinic
+  context:
+    - primary care
+    - family
+    - pediatric
+    - internal medicine
+    - physician
+    - patients
+    - outpatient
+    - clinic
+  negative: []
+  # Hard exclude: any match removes the listing from this thesis regardless of keyword hits.
+  exclude_terms:
+    - dental
+    - dentist
+    - orthodont
+    - endodont
+    - periodont
+    - oral surgery
+    - ophthalm
+    - optical
+    - optometr
+    - eye care
+    - vision center
+    - veterinary
+    - vet clinic
+    - animal hospital
+    - chiropract
+    - dermatolog
+    - plastic surgery
+    - cosmetic surgery
+    - physical therapy
+    - occupational therapy
+    - dialysis
+    - hospice
+    - nursing home
+    - skilled nursing
+    - assisted living
     - med spa
     - medical spa
     - weight loss
-    - dialysis
-    - hospice
-    - home health
-    - nursing home
-    - skilled nursing
-    - franchise
-    - chiropractic
+    - pharmacy
+    - medical device
+    - medical billing
+    - imaging center
+    - diagnostic imaging
+    - radiology
+    - laboratory
 
 geo:
   # require: qualify ONLY in a target metro/state. Off-metro and unplaceable deals are
-  # held out of the board (section 'off_geo') — they feed the detail-screening queue.
+  # held out (section 'off_geo'). Set require:false to score primary care nationwide.
   require: true
   tier1_metros: [new york, manhattan, brooklyn, los angeles, san francisco, san jose,
     palo alto, beverly hills, santa monica, newport beach, boston, cambridge, miami,

@@ -185,3 +185,21 @@ def test_norm_state():
     assert evaluator._norm_state("ca") == "CA"
     assert evaluator._norm_state("NY") == "NY"
     assert evaluator._norm_state("Remote") == ""
+
+
+# ---- hard exclude_terms (adjacent-but-wrong businesses) ----
+
+def test_exclude_terms_forces_out_even_with_keyword_hit():
+    s = {"keywords": {"tier1": ["primary care"], "context": [], "tier2": [],
+                      "negative": [], "exclude_terms": ["dental", "veterinary"]},
+         "size": {}, "flags": {"positive": [], "negative": []}}
+    # a dental practice that also says "primary care" is still excluded
+    hit = evaluator.evaluate({"business_name": "Family dental & primary care", "state": "CA"}, s)
+    assert hit["section"] == "excluded"
+    ok = evaluator.evaluate({"business_name": "Primary care clinic", "state": "CA"}, s)
+    assert ok["section"] == "in"
+
+def test_exclude_terms_absent_is_noop():
+    s = {"keywords": {"tier1": ["primary care"], "context": [], "tier2": [], "negative": []},
+         "size": {}, "flags": {"positive": [], "negative": []}}
+    assert evaluator.evaluate({"business_name": "Primary care", "state": "CA"}, s)["section"] == "in"
