@@ -35,7 +35,6 @@ export default function Search() {
 
   // detail modal
   const [openId, setOpenId] = useState<number | null>(null);
-  const [thesis, setThesis] = useState("water");
   const [detail, setDetail] = useState<any>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [votes, setVotes] = useState<Record<string, string>>({});   // `${thesis}:${id}` -> verdict
@@ -55,8 +54,8 @@ export default function Search() {
   useEffect(() => {
     if (openId == null) { setDetail(null); return; }
     setDetail(null);
-    api.listing(openId, thesis).then(setDetail).catch(() => setDetail(null));
-  }, [openId, thesis]);
+    api.listing(openId).then(setDetail).catch(() => setDetail(null));
+  }, [openId]);
 
   async function run(query = q) {
     if (!query.trim()) { setRes(null); return; }
@@ -69,9 +68,10 @@ export default function Search() {
     else { setSortKey(key); setSortDir(1); }
   }
   async function vote(v: string) {
-    if (openId == null) return;
-    const k = `${thesis}:${openId}`;
-    const status = votes[k] === v ? await api.unvote(thesis, openId) : await api.vote(thesis, openId, v);
+    if (openId == null || !detail) return;
+    const acct = detail.vote_account || "water";
+    const k = `${acct}:${openId}`;
+    const status = votes[k] === v ? await api.unvote(acct, openId) : await api.vote(acct, openId, v);
     if (status === 403) { location.href = "/login"; return; }
     if (status === 200) setVotes((m) => { const n = { ...m }; if (votes[k] === v) delete n[k]; else n[k] = v; return n; });
   }
@@ -147,20 +147,15 @@ export default function Search() {
         <div className="modal-overlay" onClick={() => setOpenId(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <div className="lens" role="group" aria-label="Thesis">
-                {["water", "healthcare"].map((t) => (
-                  <button key={t} className={t} aria-pressed={thesis === t} onClick={() => setThesis(t)}>
-                    <span className="dot" />{LABEL[t]}
-                  </button>
-                ))}
-              </div>
+              <span className="matches">
+                {detail && (detail.relevant_theses?.length
+                  ? <>Matches: {detail.relevant_theses.map((t: string) => LABEL[t] || t).join(", ")}</>
+                  : "Not currently matching a thesis")}
+              </span>
               <button className="modal-x" onClick={() => setOpenId(null)} aria-label="Close">✕</button>
             </div>
             {!detail ? <p className="note" style={{ padding: 20 }}>Loading…</p> : (
-              <DealCard d={detail} signedIn={signedIn} voted={votes[`${thesis}:${openId}`]} onVote={vote} />
-            )}
-            {detail && detail.section !== "in" && (
-              <p className="note" style={{ margin: "4px 2px 0" }}>Doesn&apos;t currently qualify for the {LABEL[thesis]} thesis (section: {detail.section}).</p>
+              <DealCard d={detail} signedIn={signedIn} voted={votes[`${detail.vote_account}:${openId}`]} onVote={vote} />
             )}
           </div>
         </div>

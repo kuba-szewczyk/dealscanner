@@ -139,6 +139,7 @@ a { color: inherit; }
   width: 30px; height: 30px; font-size: 14px; color: var(--muted); cursor: pointer; }
 .modal-x:hover { color: var(--ink); }
 .modal .deal { cursor: default; }
+.matches { font-size: 12px; font-weight: 600; color: var(--muted); }
 .capcell::-webkit-scrollbar { height: 4px; }
 .capcell::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
 .dbtable td.nowrap, .dbtable .nowrap { white-space: nowrap; }

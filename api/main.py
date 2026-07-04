@@ -223,18 +223,30 @@ def runs(limit: int = 10):
 
 
 @app.get("/listing")
-def get_listing(id: int, account: str = "water"):
-    """One listing, scored against the given thesis — so the Search modal can show the
-    same card (tier, keywords, flags) the board shows."""
+def get_listing(id: int, account: str | None = None):
+    """One listing for the Search detail popup. Thesis-neutral by default (raw facts).
+    Also reports which theses it qualifies for and a sensible thesis to attribute a
+    vote to, so the popup needs no thesis picker."""
     conn = db.connect()
     row = conn.execute("SELECT * FROM listings WHERE id=?", (id,)).fetchone()
     if not row:
         raise HTTPException(404, "listing not found")
     l = dict(row)
-    try:
-        l.update(evaluator.evaluate(l, thesis.get_settings(conn, account)))
-    except KeyError:
-        pass
+    accts = [r["slug"] for r in conn.execute("SELECT slug FROM accounts ORDER BY id").fetchall()]
+    relevant = []
+    for slug in accts:
+        try:
+            if evaluator.evaluate(dict(row), thesis.get_settings(conn, slug))["section"] == "in":
+                relevant.append(slug)
+        except KeyError:
+            pass
+    l["relevant_theses"] = relevant
+    l["vote_account"] = relevant[0] if relevant else (accts[0] if accts else "water")
+    if account:  # optional: score against a specific thesis (adds tier/keywords/flags)
+        try:
+            l.update(evaluator.evaluate(dict(row), thesis.get_settings(conn, account)))
+        except KeyError:
+            pass
     return l
 
 
