@@ -34,20 +34,35 @@ export default function Help() {
         <div className="panel hcard">
           <h2 className="hh2">From noise to a shortlist</h2>
           <p className="note">Most listings are not for you. Each stage narrows the pile so you only ever read the deals that fit — the rest stay searchable but out of your way.</p>
-          <div className="funnel">
-            {[
-              { w: 100, l: "236 brokers scanned", c: "var(--blue)" },
-              { w: 82, l: "Thousands of listings stored", c: "#3b82f6" },
-              { w: 55, l: "Global filter drops obvious misses", c: "#60a5fa" },
-              { w: 30, l: "Your thesis: keywords · size · geography", c: "#38bdf8" },
-              { w: 14, l: "A handful qualify each day", c: "var(--good)" },
-            ].map((r, i) => (
-              <div key={i} className="frow">
-                <div className="fbar" style={{ width: `${r.w}%`, background: r.c }} />
-                <span className="flabel">{r.l}</span>
-              </div>
-            ))}
-          </div>
+          {(() => {
+            const stages = [
+              { w: 100, l: "236 brokers scanned", c: "#2563eb" },
+              { w: 82, l: "Thousands of listings", c: "#3b82f6" },
+              { w: 55, l: "Global filter applied", c: "#60a5fa" },
+              { w: 30, l: "Matches your thesis", c: "#38bdf8" },
+              { w: 14, l: "A handful qualify / day", c: "#16a34a" },
+            ];
+            const cx = 84, maxHalf = 74, top = 10, bh = 30;
+            return (
+              <svg viewBox="0 0 340 170" className="funnelchart" role="img"
+                aria-label="Conversion funnel narrowing from 236 brokers to a handful of qualifying deals per day">
+                {stages.map((s, i) => {
+                  const y0 = top + i * bh, y1 = y0 + bh;
+                  const topH = (maxHalf * s.w) / 100;
+                  const botFrac = i < stages.length - 1 ? stages[i + 1].w : s.w * 0.5;
+                  const botH = (maxHalf * botFrac) / 100;
+                  const midY = (y0 + y1) / 2, midH = (topH + botH) / 2;
+                  return (
+                    <g key={i}>
+                      <polygon points={`${cx - topH},${y0} ${cx + topH},${y0} ${cx + botH},${y1} ${cx - botH},${y1}`} fill={s.c} />
+                      <line x1={cx + midH} y1={midY} x2="172" y2={midY} stroke="var(--line)" />
+                      <text x="176" y={midY + 3} className="fchart-l">{s.l}</text>
+                    </g>
+                  );
+                })}
+              </svg>
+            );
+          })()}
         </div>
 
         {/* directional learning chart */}
