@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { api, safeHref } from "@/lib/api";
 import { CAT_CLASS, catShort, fmtM, parseDate } from "@/lib/deal";
 import DealCard from "../DealCard";
 
@@ -135,7 +135,7 @@ export default function Search() {
                   <td className="r">{fmtM(r.sde)}</td>
                   <td className="r">{fmtM(r.asking_price)}</td>
                   <td className="r muted nowrap">{fmtMD(r.first_seen)}</td>
-                  <td><a className="viewlink" href={r.listing_url} target="_blank" rel="noreferrer">↗</a></td>
+                  <td><a className="viewlink" href={safeHref(r.listing_url)} target="_blank" rel="noreferrer">↗</a></td>
                 </tr>
               ))}
             </tbody>

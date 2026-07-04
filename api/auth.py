@@ -48,9 +48,12 @@ def _unsign(token: str) -> dict | None:
         return None
     if not hmac.compare_digest(sig, hmac.new(_secret(), raw.encode(), hashlib.sha256).hexdigest()[:32]):
         return None
-    pad = "=" * (-len(raw) % 4)
-    body = json.loads(base64.urlsafe_b64decode(raw + pad))
-    if body.get("exp", 0) < time.time():
+    try:
+        pad = "=" * (-len(raw) % 4)
+        body = json.loads(base64.urlsafe_b64decode(raw + pad))
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(body, dict) or body.get("exp", 0) < time.time():
         return None
     return body
 

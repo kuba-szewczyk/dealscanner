@@ -25,7 +25,7 @@ def _safe_base(request: Request) -> str:
     (preserves the domain + www + configured hosts); otherwise fall back to the
     canonical APP_BASE_URL. Blocks host-header poisoning of emailed magic links."""
     host = request.headers.get("host", "").lower()
-    if host in config.trusted_hosts() or host.endswith(".sslip.io"):
+    if host in config.trusted_hosts():
         scheme = request.headers.get("x-forwarded-proto") or "https"
         return f"{scheme}://{host}"
     return config.app_base_url()
@@ -48,7 +48,7 @@ def health():
 @app.get("/accounts")
 def accounts():
     conn = db.connect()
-    return [dict(r) for r in conn.execute("SELECT slug, name, owner_email FROM accounts").fetchall()]
+    return [dict(r) for r in conn.execute("SELECT slug, name FROM accounts").fetchall()]
 
 
 @app.get("/board")
@@ -118,8 +118,10 @@ def get_settings(account: str):
 
 
 @app.put("/settings/{account}")
-def put_settings(account: str, settings: dict = Body(...)):
+def put_settings(account: str, request: Request, settings: dict = Body(...)):
     """Edit the live thesis config. Boards reflect it immediately (instant re-rank)."""
+    if not _signed_in(request):
+        raise HTTPException(403, "sign in required")
     conn = db.connect()
     try:
         thesis.update_settings(conn, account, settings)
@@ -173,7 +175,7 @@ def auth_logout():
 def post_vote(request: Request, payload: dict = Body(...)):
     """Persist a yes/no/maybe with a full-context snapshot (future-scorer substrate).
     Operator comes from the session cookie; falls back to body for API testing."""
-    email = authmod.email_from_session(request.cookies.get("ds_session")) or payload.get("operator_email")
+    email = authmod.email_from_session(request.cookies.get("ds_session"))
     if email not in authmod.ALLOW_LIST:
         raise HTTPException(403, "sign in to vote")
     conn = db.connect()
@@ -201,7 +203,7 @@ def post_vote(request: Request, payload: dict = Body(...)):
 @app.post("/votes/clear")
 def votes_clear(request: Request, payload: dict = Body(...)):
     """Remove the signed-in operator's vote on a deal (click the verdict again to unselect)."""
-    email = authmod.email_from_session(request.cookies.get("ds_session")) or payload.get("operator_email")
+    email = authmod.email_from_session(request.cookies.get("ds_session"))
     if email not in authmod.ALLOW_LIST:
         raise HTTPException(403, "sign in to vote")
     conn = db.connect()
@@ -508,8 +510,10 @@ def broker_edit(request: Request, payload: dict = Body(...)):
 
 
 @app.get("/votes/list")
-def votes_list():
-    """Every captured verdict with deal context — the running shortlist + training substrate."""
+def votes_list(request: Request):
+    """Every captured verdict with deal context — the running shortlist + training substrate.
+    Operator emails (PII) are only returned to a signed-in operator; the public board only
+    needs listing_id / verdict / thesis to render the voted state."""
     conn = db.connect()
     rows = conn.execute(
         """SELECT v.verdict, v.listing_id, v.operator_email operator, v.created_at, a.slug thesis,
@@ -517,7 +521,13 @@ def votes_list():
            FROM votes v JOIN accounts a ON a.id = v.account_id
            LEFT JOIN listings l ON l.id = v.listing_id
            ORDER BY v.id DESC""").fetchall()
-    votes = [dict(r) for r in rows]
+    show_pii = _signed_in(request)
+    votes = []
+    for r in rows:
+        d = dict(r)
+        if not show_pii:
+            d["operator"] = None
+        votes.append(d)
     return {"total": len(votes), "votes": votes}
 
 

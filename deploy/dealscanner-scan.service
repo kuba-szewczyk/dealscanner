@@ -7,3 +7,13 @@ User=dealscanner
 WorkingDirectory=/opt/dealscanner-v2
 EnvironmentFile=/opt/dealscanner-v2/.env
 ExecStart=/opt/dealscanner-v2/deploy/scan.sh
+
+# Sandboxing: the scan writes only to the data dir (DB + logs).
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/opt/dealscanner-v2/data
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
