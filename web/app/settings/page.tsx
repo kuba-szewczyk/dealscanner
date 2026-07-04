@@ -42,6 +42,15 @@ export default function Settings() {
   const [thesis, setThesis] = useState("water");
   const [s, setS] = useState<any>(null);
   const [saved, setSaved] = useState<number | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+
+  function switchThesis(t: string) {
+    if (t === thesis) return;
+    if (dirty && !confirm("You have unsaved changes to this thesis. Switch and discard them?")) return;
+    setThesis(t);
+  }
   const [tier1, setTier1] = useState(""); const [tier2, setTier2] = useState("");
   const [context, setContext] = useState(""); const [negative, setNegative] = useState("");
   const [states, setStates] = useState(""); const [metros, setMetros] = useState("");
@@ -55,7 +64,7 @@ export default function Settings() {
 
   useEffect(() => {
     api.settings(thesis).then((d) => {
-      setS(d); setSaved(null);
+      setS(d); setSaved(null); setDirty(false); setSaveErr(null);
       setTier1((d.keywords?.tier1 || []).join("\n")); setTier2((d.keywords?.tier2 || []).join("\n"));
       setContext((d.keywords?.context || []).join(", ")); setNegative((d.keywords?.negative || []).join("\n"));
       setStates((d.geo?.tier2_states || []).join(", ")); setMetros((d.geo?.tier1_metros || []).join(", "));
@@ -73,7 +82,7 @@ export default function Settings() {
 
   const lines = (t: string) => t.split("\n").map((x) => x.trim()).filter(Boolean);
   const csv = (t: string) => t.split(",").map((x) => x.trim()).filter(Boolean);
-  const toggle = (arr: string[], set: any, k: string) => set(arr.includes(k) ? arr.filter((x) => x !== k) : [...arr, k]);
+  const toggle = (arr: string[], set: any, k: string) => { setDirty(true); set(arr.includes(k) ? arr.filter((x) => x !== k) : [...arr, k]); };
 
   async function save() {
     const next = structuredClone(s);
@@ -83,17 +92,24 @@ export default function Settings() {
     next.flags = { positive: pos, negative: neg };
     next.exclusions = { restaurants: exRest, real_estate: exRE, franchise: exFr };
     next.thresholds = { margin_good: +tMarginGood, recurring: +tRecurring, margin_low: +tMarginLow, overprice_ebitda: +tOverEb, overprice_sde: +tOverSde };
-    const r = await api.putSettings(thesis, next);
-    setS(next); setSaved(r.board_count_now);
+    setSaving(true); setSaveErr(null);
+    try {
+      const r = await api.putSettings(thesis, next);
+      setS(next); setSaved(r.board_count_now); setDirty(false);
+    } catch {
+      setSaveErr("Couldn't save — check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <main className="wrap" style={{ maxWidth: 820 }}>
+    <main className="wrap" style={{ maxWidth: 820 }} onChange={() => setDirty(true)}>
       <h1 className="h1">Thesis</h1>
       <p className="sub" style={{ marginBottom: 16 }}>Define what qualifies: keywords, size band, geography, and flags. Changes re-rank every listing instantly — no re-scrape, no cost.</p>
       <div className="lens" style={{ marginBottom: 20 }} role="group" aria-label="Thesis">
         {["water", "healthcare"].map((t) => (
-          <button key={t} className={t} aria-pressed={thesis === t} onClick={() => setThesis(t)}><span className="dot" />{t === "water" ? "Water" : "Healthcare"}</button>
+          <button key={t} className={t} aria-pressed={thesis === t} onClick={() => switchThesis(t)}><span className="dot" />{t === "water" ? "Water" : "Healthcare"}</button>
         ))}
       </div>
 
@@ -172,8 +188,9 @@ export default function Settings() {
           </div>
         </div>
 
-        <button className="btn" onClick={save}>Save &amp; re-rank</button>
-        {saved !== null && <span style={{ marginLeft: 14 }} className="live">re-ranked live · {saved} deals now clear this thesis</span>}
+        <button className="btn" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save & re-rank"}</button>
+        {saved !== null && !saveErr && <span style={{ marginLeft: 14 }} className="live">re-ranked live · {saved} deals now clear this thesis</span>}
+        {saveErr && <span style={{ marginLeft: 14, color: "var(--bad)" }} className="note">{saveErr}</span>}
       </>)}
     </main>
   );

@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import AuthNav from "./AuthNav";
+import Nav from "./Nav";
 
 export const metadata: Metadata = {
   title: {
@@ -48,17 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="tag-sub">deal sourcing</div>
             </Link>
             <div className="spacer" />
-            <nav className="nav">
-              <Link href="/">Deals</Link>
-              <Link href="/search">Search</Link>
-              <Link href="/votes">Shortlist</Link>
-              <Link href="/settings">Thesis</Link>
-              <span className="nav-div" aria-hidden />
-              <Link className="nav-util" href="/brokers">Brokers</Link>
-              <Link className="nav-util" href="/spend">Spend</Link>
-              <Link className="nav-util" href="/help">How it works</Link>
-              <Link className="nav-util" href="/build">Build this</Link>
-            </nav>
+            <Nav />
             <AuthNav />
           </div>
         </header>

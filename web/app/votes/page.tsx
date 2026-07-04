@@ -24,13 +24,17 @@ export default function Shortlist() {
   function load() { api.votesList().then(setD); }
   useEffect(() => { load(); }, []);
 
-  async function drop(target: string) {
-    setOver(null);
-    const item = drag; setDrag(null);
+  async function move(item: any, target: string) {
     if (!item || item.verdict === target) return;
     const code = await api.recategorize(item.thesis, item.listing_id, target);
     if (code === 403) { location.href = "/login"; return; }
     if (code === 200) load();
+    else alert("Couldn't move that deal — please try again.");
+  }
+  async function drop(target: string) {
+    setOver(null);
+    const item = drag; setDrag(null);
+    await move(item, target);
   }
 
   const votes = useMemo(
@@ -76,19 +80,29 @@ export default function Shortlist() {
                   onDragOver={(e) => { e.preventDefault(); setOver(v); }}
                   onDragLeave={() => setOver((o) => (o === v ? null : o))}
                   onDrop={() => drop(v)}>
-                  {items.length === 0 && <p className="note" style={{ margin: 0 }}>Drag deals here.</p>}
-                  {items.map((x: any) => (
+                  {items.length === 0 && <p className="note" style={{ margin: 0 }}>Drag a deal here, or use the buttons on each row.</p>}
+                  {items.map((x: any) => {
+                    const item = { listing_id: x.listing_id, thesis: x.thesis, verdict: v };
+                    return (
                     <div className="vrow" key={String(x.listing_id) + x.operator} draggable
                       style={{ cursor: "grab" }}
-                      onDragStart={() => setDrag({ listing_id: x.listing_id, thesis: x.thesis, verdict: v })}
+                      onDragStart={() => setDrag(item)}
                       onDragEnd={() => setOver(null)}>
-                      <span style={{ color: "var(--faint)", letterSpacing: "-2px", fontSize: 14 }}>⋮⋮</span>
+                      <span aria-hidden style={{ color: "var(--faint)", letterSpacing: "-2px", fontSize: 14 }}>⋮⋮</span>
                       <span className="vname">
                         {x.listing_url ? <a draggable={false} href={safeHref(x.listing_url)} target="_blank" rel="noreferrer">{x.business_name}</a> : x.business_name}
                       </span>
                       <span className="vmeta">{x.operator?.split("@")[0]} · {(x.created_at || "").slice(0, 10)}</span>
+                      <span className="vmove" role="group" aria-label="Move this deal">
+                        {ORDER.map((t) => (
+                          <button key={t} className={`vmovebtn ${t} ${v === t ? "on" : ""}`} disabled={v === t}
+                            aria-pressed={v === t} aria-label={`Move to ${t}`} title={`Move to ${t}`}
+                            onClick={() => move(item, t)}>{t}</button>
+                        ))}
+                      </span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );

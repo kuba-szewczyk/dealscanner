@@ -38,17 +38,22 @@ export default function DealCard({ d, signedIn, voted, onVote }: Props) {
           <a className="viewlink" href={safeHref(d.listing_url)} target="_blank" rel="noreferrer">view listing ↗</a>
         </div>
       </div>
-      <div className="fincol num">
-        <div className="fin"><span>Rev</span><b>{fmtM(d.revenue)}</b></div>
-        <div className="fin"><span>EBITDA</span><b>{fmtM(d.ebitda)}</b></div>
-        <div className="fin"><span>SDE</span><b>{fmtM(d.sde)}</b></div>
-        <div className="fin"><span>Ask</span><b>{fmtM(d.asking_price)}</b></div>
-        <div className="fin"><span>Mult</span><b>{d.multiple ? `${d.multiple}x` : "—"}</b></div>
-      </div>
+      {(d.revenue == null && d.ebitda == null && d.sde == null && d.asking_price == null) ? (
+        <div className="fincol num undisclosed"><span>Financials<br />undisclosed</span></div>
+      ) : (
+        <div className="fincol num">
+          <div className="fin"><span>Rev</span><b>{fmtM(d.revenue)}</b></div>
+          <div className="fin"><span>EBITDA</span><b>{fmtM(d.ebitda)}</b></div>
+          <div className="fin"><span>SDE</span><b>{fmtM(d.sde)}</b></div>
+          <div className="fin"><span>Ask</span><b>{fmtM(d.asking_price)}</b></div>
+          <div className="fin"><span>Mult</span><b>{d.multiple ? `${d.multiple}x` : "—"}</b></div>
+        </div>
+      )}
       {signedIn && onVote && (
         <div className="votecol">
           {["yes", "maybe", "no"].map((v) => (
-            <button key={v} className={`${v} ${voted === v ? "on" : ""}`} onClick={() => onVote(v)}>{v}</button>
+            <button key={v} className={`${v} ${voted === v ? "on" : ""}`} aria-pressed={voted === v}
+              aria-label={`Vote ${v}`} onClick={() => onVote(v)}>{v}</button>
           ))}
         </div>
       )}

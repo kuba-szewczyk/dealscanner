@@ -12,7 +12,7 @@ export default function AuthNav() {
   return (
     <span className="whoami">
       {email.split("@")[0]}
-      <button onClick={async () => { await api.logout(); location.reload(); }} title="Sign out">↪</button>
+      <button onClick={async () => { await api.logout(); location.reload(); }} title="Sign out" aria-label="Sign out">↪</button>
     </span>
   );
 }

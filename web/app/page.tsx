@@ -74,15 +74,21 @@ export default function Board() {
   }, [thesis]);
 
   async function cast(d: Deal, verdict: string) {
-    if (voted[d.id] === verdict) {
-      const status = await api.unvote(thesis, d.id);
-      if (status === 200) setVoted((v) => { const n = { ...v }; delete n[d.id]; return n; });
+    try {
+      if (voted[d.id] === verdict) {
+        const status = await api.unvote(thesis, d.id);
+        if (status === 200) setVoted((v) => { const n = { ...v }; delete n[d.id]; return n; });
+        else if (status === 403) window.location.href = "/login";
+        else alert("Couldn't update your vote — please try again.");
+        return;
+      }
+      const status = await api.vote(thesis, d.id, verdict);
+      if (status === 200) setVoted((v) => ({ ...v, [d.id]: verdict }));
       else if (status === 403) window.location.href = "/login";
-      return;
+      else alert("Couldn't record your vote — please try again.");
+    } catch {
+      alert("Network error — your vote didn't go through. Please try again.");
     }
-    const status = await api.vote(thesis, d.id, verdict);
-    if (status === 200) setVoted((v) => ({ ...v, [d.id]: verdict }));
-    else if (status === 403) window.location.href = "/login";
   }
 
   // Quick-period window (days back from today), or explicit from/to in custom mode.

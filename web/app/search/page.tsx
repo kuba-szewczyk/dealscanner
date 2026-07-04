@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, safeHref } from "@/lib/api";
 import { CAT_CLASS, catShort, fmtM, parseDate } from "@/lib/deal";
 import DealCard from "../DealCard";
@@ -38,6 +38,28 @@ export default function Search() {
   const [detail, setDetail] = useState<any>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [votes, setVotes] = useState<Record<string, string>>({});   // `${thesis}:${id}` -> verdict
+  const modalRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  // Modal keyboard: ESC to close, focus into the dialog on open, trap Tab, restore focus on close.
+  useEffect(() => {
+    if (openId == null) return;
+    const el = modalRef.current;
+    (el?.querySelector<HTMLElement>("[data-autofocus]") || el)?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") { setOpenId(null); return; }
+      if (e.key === "Tab" && el) {
+        const f = Array.from(el.querySelectorAll<HTMLElement>(
+          'button, a[href], input, [tabindex]:not([tabindex="-1"])')).filter((n) => n.offsetParent !== null);
+        if (!f.length) return;
+        const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); triggerRef.current?.focus(); };
+  }, [openId]);
 
   useEffect(() => {
     api.me().then((d) => setSignedIn(!!d.email)).catch(() => setSignedIn(false));
@@ -71,9 +93,14 @@ export default function Search() {
     if (openId == null || !detail) return;
     const acct = detail.vote_account || "water";
     const k = `${acct}:${openId}`;
-    const status = votes[k] === v ? await api.unvote(acct, openId) : await api.vote(acct, openId, v);
-    if (status === 403) { location.href = "/login"; return; }
-    if (status === 200) setVotes((m) => { const n = { ...m }; if (votes[k] === v) delete n[k]; else n[k] = v; return n; });
+    try {
+      const status = votes[k] === v ? await api.unvote(acct, openId) : await api.vote(acct, openId, v);
+      if (status === 403) { location.href = "/login"; return; }
+      if (status === 200) setVotes((m) => { const n = { ...m }; if (votes[k] === v) delete n[k]; else n[k] = v; return n; });
+      else alert("Couldn't record your vote — please try again.");
+    } catch {
+      alert("Network error — your vote didn't go through. Please try again.");
+    }
   }
 
   const rows = useMemo(() => {
@@ -116,8 +143,10 @@ export default function Search() {
               <tr>
                 {COLS.map((c) => (
                   <th key={c.key} className={`${c.align === "r" ? "r " : ""}sorth${sortKey === c.key ? " on" : ""}`}
-                    onClick={() => clickSort(c.key)} title="Click to sort">
-                    {c.label}<span className="arrow">{sortKey === c.key ? (sortDir === 1 ? " ▲" : " ▼") : ""}</span>
+                    aria-sort={sortKey === c.key ? (sortDir === 1 ? "ascending" : "descending") : "none"}>
+                    <button className="sortbtn" onClick={() => clickSort(c.key)}>
+                      {c.label}<span className="arrow">{sortKey === c.key ? (sortDir === 1 ? " ▲" : " ▼") : ""}</span>
+                    </button>
                   </th>
                 ))}
                 <th></th>
@@ -127,7 +156,7 @@ export default function Search() {
               {rows.map((r: any) => (
                 <tr key={r.id}>
                   <td>{r.category && <span className={`cat ${CAT_CLASS[r.category] || "c-gray"}`}>{catShort(r.category)}</span>}</td>
-                  <td><button className="linkname capcell wide" title={r.business_name} onClick={() => setOpenId(r.id)}>{r.business_name}</button></td>
+                  <td><button className="linkname capcell wide" title={r.business_name} onClick={(e) => { triggerRef.current = e.currentTarget; setOpenId(r.id); }}>{r.business_name}</button></td>
                   <td className="muted"><span className="capcell loc" title={loc(r)}>{loc(r) || "—"}</span></td>
                   <td className="muted"><span className="capcell narrow" title={r.broker}>{r.broker}</span></td>
                   <td className="r">{fmtM(r.revenue)}</td>
@@ -135,7 +164,7 @@ export default function Search() {
                   <td className="r">{fmtM(r.sde)}</td>
                   <td className="r">{fmtM(r.asking_price)}</td>
                   <td className="r muted nowrap">{fmtMD(r.first_seen)}</td>
-                  <td><a className="viewlink" href={safeHref(r.listing_url)} target="_blank" rel="noreferrer">↗</a></td>
+                  <td><a className="viewlink" href={safeHref(r.listing_url)} target="_blank" rel="noreferrer" aria-label="Open listing">↗</a></td>
                 </tr>
               ))}
             </tbody>
@@ -145,14 +174,15 @@ export default function Search() {
 
       {openId != null && (
         <div className="modal-overlay" onClick={() => setOpenId(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="Deal details"
+            ref={modalRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <span className="matches">
                 {detail && (detail.relevant_theses?.length
                   ? <>Matches: {detail.relevant_theses.map((t: string) => LABEL[t] || t).join(", ")}</>
                   : "Not currently matching a thesis")}
               </span>
-              <button className="modal-x" onClick={() => setOpenId(null)} aria-label="Close">✕</button>
+              <button className="modal-x" data-autofocus onClick={() => setOpenId(null)} aria-label="Close">✕</button>
             </div>
             {!detail ? <p className="note" style={{ padding: 20 }}>Loading…</p> : (
               <DealCard d={detail} signedIn={signedIn} voted={votes[`${detail.vote_account}:${openId}`]} onVote={vote} />

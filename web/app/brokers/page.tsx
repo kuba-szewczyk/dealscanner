@@ -29,8 +29,10 @@ export default function Brokers() {
   }, [live, sort]);
 
   const th = (k: string, label: string, cls = "") => (
-    <th className={cls} onClick={() => setSort((s) => ({ k, dir: s.k === k ? -s.dir : (k === "broker" ? 1 : -1) }))}>
-      {label}{sort.k === k && <span className="arrow"> {sort.dir === 1 ? "▲" : "▼"}</span>}
+    <th className={`sorth ${cls}`} aria-sort={sort.k === k ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
+      <button className="sortbtn" onClick={() => setSort((s) => ({ k, dir: s.k === k ? -s.dir : (k === "broker" ? 1 : -1) }))}>
+        {label}{sort.k === k && <span className="arrow"> {sort.dir === 1 ? "▲" : "▼"}</span>}
+      </button>
     </th>
   );
   const seen = (d: number) => d < 0 ? "no data" : d === 0 ? "today" : `${d}d ago`;
@@ -67,7 +69,7 @@ export default function Brokers() {
       <>
         <span className={`bname ${editMode ? "editable" : ""}`} title={editMode ? "Click to edit" : r.broker}
           onClick={() => editMode && startEdit(r)}>{r.broker}</span>
-        {r.url && !editMode && <a className="exticon" href={safeHref(r.url)} target="_blank" rel="noreferrer" title="Open broker site">↗</a>}
+        {r.url && !editMode && <a className="exticon" href={safeHref(r.url)} target="_blank" rel="noreferrer" title="Open broker site" aria-label="Open broker site">↗</a>}
         {!!r.block_count && r.block_count > 0 && (
           <span className="blocktag" title={`Firecrawl couldn't load this broker's pages ${r.block_count}× (last ${(r.last_blocked_at || "").slice(0, 10)}). Likely unscrapeable long-term.`}>
             ⛔ blocked ×{r.block_count}
