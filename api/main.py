@@ -222,6 +222,22 @@ def runs(limit: int = 10):
     return {"total_spend_usd": round(total, 4), "runs": rows}
 
 
+@app.get("/listing")
+def get_listing(id: int, account: str = "water"):
+    """One listing, scored against the given thesis — so the Search modal can show the
+    same card (tier, keywords, flags) the board shows."""
+    conn = db.connect()
+    row = conn.execute("SELECT * FROM listings WHERE id=?", (id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "listing not found")
+    l = dict(row)
+    try:
+        l.update(evaluator.evaluate(l, thesis.get_settings(conn, account)))
+    except KeyError:
+        pass
+    return l
+
+
 @app.get("/spend")
 def spend(account: str = "water", days: int = 30):
     """Day-by-day engine spend vs listings gained, split relevant/irrelevant for the

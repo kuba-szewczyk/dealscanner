@@ -4,8 +4,29 @@ import Link from "next/link";
 import AuthNav from "./AuthNav";
 
 export const metadata: Metadata = {
-  title: "DealScanner",
-  description: "Thesis-agnostic deal-sourcing platform",
+  title: {
+    default: "DealScanner — business broker aggregator for searchers",
+    template: "%s · DealScanner",
+  },
+  description:
+    "DealScanner aggregates business-for-sale listings from hundreds of brokers into one daily, thesis-filtered feed of acquisition targets — built for search fund leaders, independent sponsors, and self-funded searchers.",
+  keywords: [
+    "business broker aggregator", "businesses for sale", "search fund", "search fund deal sourcing",
+    "independent sponsor", "self-funded search", "acquisition targets", "SMB acquisition",
+    "deal sourcing", "proprietary deal flow", "business acquisition",
+  ],
+  openGraph: {
+    title: "DealScanner — business broker aggregator for searchers",
+    description:
+      "Hundreds of business brokers, aggregated into one daily thesis-filtered feed of acquisition targets. Built for search fund leaders and independent sponsors.",
+    type: "website",
+    siteName: "DealScanner",
+  },
+  twitter: {
+    card: "summary",
+    title: "DealScanner — business broker aggregator for searchers",
+    description: "One daily, thesis-filtered feed of business-for-sale listings for searchers and independent sponsors.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

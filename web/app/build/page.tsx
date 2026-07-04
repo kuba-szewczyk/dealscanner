@@ -1,6 +1,6 @@
 import CopyPrompt from "./CopyPrompt";
 
-export const metadata = { title: "Build this — DealScanner" };
+export const metadata = { title: "Build this" };
 
 const REPO = "https://github.com/kuba-szewczyk/dealscanner";
 

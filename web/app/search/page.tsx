@@ -1,21 +1,10 @@
 "use client";
-import { useMemo, useState } from "react";
-import { api, safeHref } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
+import { CAT_CLASS, catShort, fmtM, parseDate } from "@/lib/deal";
+import DealCard from "../DealCard";
 
-const CAT_CLASS: Record<string, string> = {
-  "Healthcare": "c-teal", "Restaurant & Food": "c-pink", "Construction & Trades": "c-amber",
-  "Manufacturing": "c-purple", "Retail & E-commerce": "c-rose", "Professional Services": "c-blue",
-  "Personal Care & Fitness": "c-green", "Real Estate & Property": "c-slate",
-  "Distribution & Wholesale": "c-indigo", "Auto & Transport": "c-orange",
-  "Education & Childcare": "c-cyan", "Cleaning & Facilities": "c-lime",
-  "Hospitality & Lodging": "c-brown", "Other": "c-gray",
-};
-const fmtM = (v?: number | null) => (v == null ? "—" : `$${(v / 1e6).toFixed(1)}M`);
-function parseDate(s?: string): Date | null {
-  if (!s) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
-}
+const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
 // Year dropped — every listing is the current year.
 const fmtMD = (s?: string) => {
   const d = parseDate(s);
@@ -41,8 +30,33 @@ export default function Search() {
   const [res, setRes] = useState<any[] | null>(null);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [sortKey, setSortKey] = useState<string | null>(null);  // null = server "best match" order
+  const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<1 | -1>(1);
+
+  // detail modal
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [thesis, setThesis] = useState("water");
+  const [detail, setDetail] = useState<any>(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const [votes, setVotes] = useState<Record<string, string>>({});   // `${thesis}:${id}` -> verdict
+
+  useEffect(() => {
+    api.me().then((d) => setSignedIn(!!d.email)).catch(() => setSignedIn(false));
+    loadVotes();
+  }, []);
+  function loadVotes() {
+    api.votesList().then((d) => {
+      const m: Record<string, string> = {};
+      (d.votes || []).forEach((v: any) => { const k = `${v.thesis}:${v.listing_id}`; if (!(k in m)) m[k] = v.verdict; });
+      setVotes(m);
+    }).catch(() => {});
+  }
+
+  useEffect(() => {
+    if (openId == null) { setDetail(null); return; }
+    setDetail(null);
+    api.listing(openId, thesis).then(setDetail).catch(() => setDetail(null));
+  }, [openId, thesis]);
 
   async function run(query = q) {
     if (!query.trim()) { setRes(null); return; }
@@ -50,10 +64,16 @@ export default function Search() {
     const d = await api.search(query.trim(), "accuracy");
     setRes(d.results); setCount(d.count); setSortKey(null); setLoading(false);
   }
-
   function clickSort(key: string) {
     if (sortKey === key) setSortDir((d) => (d === 1 ? -1 : 1));
     else { setSortKey(key); setSortDir(1); }
+  }
+  async function vote(v: string) {
+    if (openId == null) return;
+    const k = `${thesis}:${openId}`;
+    const status = votes[k] === v ? await api.unvote(thesis, openId) : await api.vote(thesis, openId, v);
+    if (status === 403) { location.href = "/login"; return; }
+    if (status === 200) setVotes((m) => { const n = { ...m }; if (votes[k] === v) delete n[k]; else n[k] = v; return n; });
   }
 
   const rows = useMemo(() => {
@@ -63,14 +83,8 @@ export default function Search() {
     const arr = [...res];
     arr.sort((a, b) => {
       const va = col.get(a), vb = col.get(b);
-      if (col.type === "num") {
-        const na = va == null ? -Infinity : va, nb = vb == null ? -Infinity : vb;
-        return (na - nb) * sortDir;
-      }
-      if (col.type === "date") {
-        const da = parseDate(va)?.getTime() ?? -Infinity, db = parseDate(vb)?.getTime() ?? -Infinity;
-        return (da - db) * sortDir;
-      }
+      if (col.type === "num") return ((va == null ? -Infinity : va) - (vb == null ? -Infinity : vb)) * sortDir;
+      if (col.type === "date") return (((parseDate(va)?.getTime() ?? -Infinity) - (parseDate(vb)?.getTime() ?? -Infinity))) * sortDir;
       return String(va).localeCompare(String(vb)) * sortDir;
     });
     return arr;
@@ -80,7 +94,7 @@ export default function Search() {
     <main className="wrap">
       <div className="boardhead">
         <h1 className="h1">Search</h1>
-        <p className="sub">Search every listing by name, description, category, or broker. Click any column header to sort.</p>
+        <p className="sub">Search every listing by name, description, category, or broker. Click any column header to sort, or a business name for the full deal card.</p>
         <div className="searchbar">
           <input className="searchinput" placeholder="e.g. HVAC distributor, dental, recurring revenue…"
             value={q} onChange={(e) => setQ(e.target.value)}
@@ -112,20 +126,43 @@ export default function Search() {
             <tbody>
               {rows.map((r: any) => (
                 <tr key={r.id}>
-                  <td>{r.category && <span className={`cat ${CAT_CLASS[r.category] || "c-gray"}`}>{r.category}</span>}</td>
-                  <td><span className="capcell wide" title={r.business_name}>{r.business_name}</span></td>
-                  <td className="muted"><span className="capcell narrow" title={loc(r)}>{loc(r) || "—"}</span></td>
+                  <td>{r.category && <span className={`cat ${CAT_CLASS[r.category] || "c-gray"}`}>{catShort(r.category)}</span>}</td>
+                  <td><button className="linkname capcell wide" title={r.business_name} onClick={() => setOpenId(r.id)}>{r.business_name}</button></td>
+                  <td className="muted"><span className="capcell loc" title={loc(r)}>{loc(r) || "—"}</span></td>
                   <td className="muted"><span className="capcell narrow" title={r.broker}>{r.broker}</span></td>
                   <td className="r">{fmtM(r.revenue)}</td>
                   <td className="r">{fmtM(r.ebitda)}</td>
                   <td className="r">{fmtM(r.sde)}</td>
                   <td className="r">{fmtM(r.asking_price)}</td>
                   <td className="r muted nowrap">{fmtMD(r.first_seen)}</td>
-                  <td><a className="viewlink" href={safeHref(r.listing_url)} target="_blank" rel="noreferrer">↗</a></td>
+                  <td><a className="viewlink" href={r.listing_url} target="_blank" rel="noreferrer">↗</a></td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {openId != null && (
+        <div className="modal-overlay" onClick={() => setOpenId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="lens" role="group" aria-label="Thesis">
+                {["water", "healthcare"].map((t) => (
+                  <button key={t} className={t} aria-pressed={thesis === t} onClick={() => setThesis(t)}>
+                    <span className="dot" />{LABEL[t]}
+                  </button>
+                ))}
+              </div>
+              <button className="modal-x" onClick={() => setOpenId(null)} aria-label="Close">✕</button>
+            </div>
+            {!detail ? <p className="note" style={{ padding: 20 }}>Loading…</p> : (
+              <DealCard d={detail} signedIn={signedIn} voted={votes[`${thesis}:${openId}`]} onVote={vote} />
+            )}
+            {detail && detail.section !== "in" && (
+              <p className="note" style={{ margin: "4px 2px 0" }}>Doesn&apos;t currently qualify for the {LABEL[thesis]} thesis (section: {detail.section}).</p>
+            )}
+          </div>
         </div>
       )}
     </main>

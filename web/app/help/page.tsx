@@ -1,4 +1,4 @@
-export const metadata = { title: "How it works — DealScanner" };
+export const metadata = { title: "How it works" };
 
 const STEPS = [
   { n: 1, t: "Brokers", d: "A curated list of 236 business-for-sale brokers is the raw supply. You manage it on the Brokers page — add, archive, or fix a source." },

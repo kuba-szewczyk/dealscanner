@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { api, Deal, safeHref } from "@/lib/api";
+import DealCard from "./DealCard";
 
 const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
 const FLAG_LABEL: Record<string, string> = {
@@ -172,47 +173,7 @@ export default function Board() {
             <h3>Confidence {g.c}/5</h3><span className="n">({g.items.length})</span>
           </div>
           {g.items.map((d: any) => (
-            <article className="deal" key={d.id}>
-              <div className="content">
-                <div className="deal-top">
-                  <span className={`tierdot ${d.tier}`}>{d.tier}</span>
-                  <span className="deal-name">{d.business_name}</span>
-                </div>
-                <div className="meta">
-                  {d.category && <span className={`cat ${CAT_CLASS[d.category] || "c-gray"}`}>{d.category}</span>}
-                  {(d.city || d.state) && <span className="geo">{[d.city, d.state].filter(Boolean).join(", ")}</span>}
-                  {d.first_seen && <span className="spotted">scraped {fmtDate(d.first_seen)}</span>}
-                </div>
-                {d.one_line_take && <p className="blurb">{d.one_line_take}</p>}
-                {d.matched_keywords && (
-                  <div className="kw"><b>Keywords:</b> {d.matched_keywords.split(",").map((k: string) => k.trim()).filter(Boolean).join(" · ")}</div>
-                )}
-                {(d.positive_flags?.length || d.negative_flags?.length) ? (
-                  <div className="flags">
-                    {(d.positive_flags || []).map((f: string) => <span key={f} className="gf">✓ {FLAG_LABEL[f] || f}</span>)}
-                    {(d.negative_flags || []).map((f: string) => <span key={f} className="rf">⚠ {FLAG_LABEL[f] || f}</span>)}
-                  </div>
-                ) : null}
-                <div className="dealfoot">
-                  <span className="broker">{d.broker}</span>
-                  <a className="viewlink" href={safeHref(d.listing_url)} target="_blank" rel="noreferrer">view listing ↗</a>
-                </div>
-              </div>
-              <div className="fincol num">
-                <div className="fin"><span>Rev</span><b>{fmtM(d.revenue)}</b></div>
-                <div className="fin"><span>EBITDA</span><b>{fmtM(d.ebitda)}</b></div>
-                <div className="fin"><span>SDE</span><b>{fmtM(d.sde)}</b></div>
-                <div className="fin"><span>Ask</span><b>{fmtM(d.asking_price)}</b></div>
-                <div className="fin"><span>Mult</span><b>{d.multiple ? `${d.multiple}x` : "—"}</b></div>
-              </div>
-              {signedIn && (
-                <div className="votecol">
-                  {["yes", "maybe", "no"].map((v) => (
-                    <button key={v} className={`${v} ${voted[d.id] === v ? "on" : ""}`} onClick={() => cast(d, v)}>{v}</button>
-                  ))}
-                </div>
-              )}
-            </article>
+            <DealCard key={d.id} d={d} signedIn={signedIn} voted={voted[d.id]} onVote={(v) => cast(d, v)} />
           ))}
         </section>
       ))}

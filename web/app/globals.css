@@ -123,6 +123,21 @@ a { color: inherit; }
 .capcell { display: block; white-space: nowrap; overflow-x: auto; overflow-y: hidden; }
 .capcell.wide { max-width: 300px; font-weight: 600; }
 .capcell.narrow { max-width: 150px; }
+.capcell.loc { max-width: 96px; }
+/* clickable business name in the Search table */
+.linkname { border: 0; background: none; padding: 0; margin: 0; font: inherit; font-weight: 600;
+  color: var(--blue); cursor: pointer; text-align: left; }
+.linkname:hover { text-decoration: underline; }
+/* Search detail modal */
+.modal-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(15,23,42,.45);
+  display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px 16px; overflow-y: auto; }
+.modal { width: 100%; max-width: 760px; background: var(--surface); border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(15,23,42,.3); padding: 14px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.modal-x { border: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  width: 30px; height: 30px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.modal-x:hover { color: var(--ink); }
+.modal .deal { cursor: default; }
 .capcell::-webkit-scrollbar { height: 4px; }
 .capcell::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
 .dbtable td.nowrap, .dbtable .nowrap { white-space: nowrap; }
@@ -207,7 +222,7 @@ a { color: inherit; }
 .deal-name { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; margin: 0; }
 .deal-loc { color: var(--faint); font-weight: 500; font-size: 14px; }
 .meta { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 10px; margin: 1px 0 9px 31px; }
-.cat { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 5px; }
+.cat { display: inline-block; white-space: nowrap; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 5px; }
 .cat.c-blue { background: #e0ecff; color: #1d4ed8; }
 .cat.c-purple { background: #ede9fe; color: #6d28d9; }
 .cat.c-teal { background: #d6f3ef; color: #0e7c86; }
