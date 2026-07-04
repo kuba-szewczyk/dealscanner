@@ -264,9 +264,10 @@ def scrape_one(name: str, url: str, conn, client, excl: dict,
     note = (f"{name}: {tagged} tagged, {refreshed} refreshed, "
             f"pages={pginfo['pages']}, fed={chars_fed}c (raw {pginfo['raw_chars']}c){trunc}")
     cur = conn.execute(
-        "INSERT INTO runs(kind, started_at, ended_at, listings_processed, new_count, cost_usd, note) "
-        "VALUES ('scrape',?,?,?,?,?,?)",
-        (started, datetime.now(timezone.utc).isoformat(), len(cards), inserted, cost, note),
+        "INSERT INTO runs(kind, started_at, ended_at, listings_processed, new_count, cost_usd, note, "
+        "model, in_tokens, out_tokens) VALUES ('scrape',?,?,?,?,?,?,?,?,?)",
+        (started, datetime.now(timezone.utc).isoformat(), len(cards), inserted, cost, note,
+         EXTRACT_MODEL, resp.usage.input_tokens, resp.usage.output_tokens),
     )
     run_id = cur.lastrowid
     status = "new" if inserted else ("active" if cards else "silent")

@@ -121,6 +121,7 @@ def enrich(max_usd: float = 1.00, limit: int | None = None) -> dict:
         return datetime.now(timezone.utc).isoformat()
 
     spent = 0.0
+    in_tok = out_tok = 0
     filled = haiku_calls = dead = regex_only = errors = blocked = 0
     for c in cands:
         if spent >= max_usd:
@@ -147,6 +148,7 @@ def enrich(max_usd: float = 1.00, limit: int | None = None) -> dict:
                         model=EXTRACT_MODEL, max_tokens=400, system=_DETAIL_SYSTEM,
                         messages=[{"role": "user", "content": md[:24000]}])
                     spent += _cost(EXTRACT_MODEL, resp.usage.input_tokens, resp.usage.output_tokens)
+                    in_tok += resp.usage.input_tokens; out_tok += resp.usage.output_tokens
                     haiku_calls += 1
                     raw = "".join(b.text for b in resp.content if hasattr(b, "text"))
                     got = {}
@@ -192,11 +194,12 @@ def enrich(max_usd: float = 1.00, limit: int | None = None) -> dict:
             continue
 
     conn.execute(
-        "INSERT INTO runs(kind, started_at, ended_at, listings_processed, new_count, cost_usd, note) "
-        "VALUES ('enrich',?,?,?,?,?,?)",
+        "INSERT INTO runs(kind, started_at, ended_at, listings_processed, new_count, cost_usd, note, "
+        "model, in_tokens, out_tokens) VALUES ('enrich',?,?,?,?,?,?,?,?,?)",
         (now(), now(), len(cands), filled, round(spent, 4),
          f"{filled} filled, {regex_only} regex-only, {haiku_calls} haiku, {dead} dead, "
-         f"{errors} errors ({blocked} broker-blocked)"))
+         f"{errors} errors ({blocked} broker-blocked)",
+         EXTRACT_MODEL, in_tok, out_tok))
     conn.commit()
     return {"processed": len(cands), "filled": filled, "regex_only": regex_only,
             "haiku_calls": haiku_calls, "dead_detail": dead, "errors": errors,

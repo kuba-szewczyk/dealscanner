@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
 const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
@@ -11,7 +11,19 @@ function fmtDay(s: string) {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-type Day = { date: string; cost: number; relevant: number; irrelevant: number; total_new: number };
+type Day = {
+  date: string; cost: number; relevant: number; irrelevant: number; total_new: number;
+  model_costs: Record<string, number>; claude_tokens: number; brokers: number; firecrawl_pages: number;
+};
+
+// Short label + colour per Claude model, for the cost-mix bar.
+const MODEL_META: Record<string, { name: string; c: string }> = {
+  "claude-haiku-4-5": { name: "Haiku", c: "#60a5fa" },
+  "claude-sonnet-4-5": { name: "Sonnet", c: "#a78bfa" },
+  "claude-opus-4-8": { name: "Opus", c: "#f472b6" },
+};
+const modelMeta = (m: string) => MODEL_META[m] || { name: m.replace("claude-", ""), c: "#94a3b8" };
+const fmtTok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}k` : `${n}`);
 
 export default function Spend() {
   const [thesis, setThesis] = useState("water");
@@ -23,8 +35,6 @@ export default function Spend() {
     setLoading(true);
     api.spend(thesis, 30).then((d) => { setSummary(d.summary); setDaily(d.daily); setLoading(false); });
   }, [thesis]);
-
-  const maxNew = useMemo(() => Math.max(1, ...daily.map((d) => d.total_new)), [daily]);
 
   return (
     <main className="wrap">
@@ -57,31 +67,36 @@ export default function Spend() {
               <tr>
                 <th>Day</th>
                 <th className="r">Cost</th>
+                <th>Cost by model</th>
+                <th className="r">Brokers</th>
                 <th className="r">New listings</th>
                 <th className="r">Relevant</th>
                 <th className="r">Not relevant</th>
-                <th>Mix</th>
-                <th className="r">Cost / relevant</th>
+                <th className="r">Firecrawl</th>
               </tr>
             </thead>
             <tbody>
               {daily.map((d) => {
-                const relPct = d.total_new ? (d.relevant / d.total_new) * 100 : 0;
-                const barW = (d.total_new / maxNew) * 100;
-                const perRel = d.relevant > 0 ? money(d.cost / d.relevant) : "—";
+                const models = Object.entries(d.model_costs || {}).sort((a, b) => b[1] - a[1]);
+                const modelTotal = models.reduce((s, [, v]) => s + v, 0);
                 return (
                   <tr key={d.date}>
                     <td className="nowrap">{fmtDay(d.date)}</td>
                     <td className="r">{money(d.cost)}</td>
+                    <td>
+                      {modelTotal > 0 ? (
+                        <span className="modelbar" title={models.map(([m, v]) => `${modelMeta(m).name}: ${money(v)}`).join(" · ") + ` · ${fmtTok(d.claude_tokens)} Claude tokens`}>
+                          {models.map(([m, v]) => (
+                            <span key={m} style={{ width: `${(v / modelTotal) * 100}%`, background: modelMeta(m).c }} />
+                          ))}
+                        </span>
+                      ) : <span className="muted">—</span>}
+                    </td>
+                    <td className="r">{d.brokers || "—"}</td>
                     <td className="r">{d.total_new}</td>
                     <td className="r"><b style={{ color: "#15803d" }}>{d.relevant}</b></td>
                     <td className="r muted">{d.irrelevant}</td>
-                    <td>
-                      <span className="mixbar" title={`${d.relevant} relevant / ${d.irrelevant} not relevant`} style={{ width: `${Math.max(barW, 4)}%` }}>
-                        <span className="mixrel" style={{ width: `${relPct}%` }} />
-                      </span>
-                    </td>
-                    <td className="r muted">{perRel}</td>
+                    <td className="r muted">{d.firecrawl_pages ? `${d.firecrawl_pages} pg` : "—"}</td>
                   </tr>
                 );
               })}
@@ -89,9 +104,12 @@ export default function Spend() {
           </table>
         </div>
       )}
-      <p className="cost" style={{ textAlign: "left", marginTop: 10 }}>
-        Green = deals that clear the {LABEL[thesis]} thesis. “Cost / relevant” is that day’s spend divided by the relevant deals it surfaced.
-      </p>
+      <div className="modellegend">
+        {Object.entries(MODEL_META).map(([m, meta]) => (
+          <span key={m}><i style={{ background: meta.c }} />{meta.name}</span>
+        ))}
+        <span className="muted">· “Cost by model” shows what drove each day’s Claude spend. “Firecrawl” = pages fetched (credits). Green = deals that clear the {LABEL[thesis]} thesis.</span>
+      </div>
     </main>
   );
 }

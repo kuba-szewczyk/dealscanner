@@ -259,6 +259,30 @@ def spend(account: str = "water", days: int = 30):
         if r["d"]:
             cost_by_day[r["d"]] = {"cost": r["cost"], "run_new": r["newc"]}
 
+    # per-model cost split per day (old runs have NULL model -> attribute to the model
+    # that was in use then, claude-haiku-4-5), plus Claude token totals
+    model_by_day: dict[str, dict] = {}
+    tokens_by_day: dict[str, int] = {}
+    for r in conn.execute(
+            "SELECT date(started_at) d, COALESCE(model,'claude-haiku-4-5') m, "
+            "ROUND(COALESCE(SUM(cost_usd),0),4) cost, "
+            "COALESCE(SUM(in_tokens),0)+COALESCE(SUM(out_tokens),0) tok FROM runs "
+            "WHERE started_at >= date('now', ?) GROUP BY date(started_at), m",
+            (f"-{days} day",)).fetchall():
+        if r["d"]:
+            model_by_day.setdefault(r["d"], {})[r["m"]] = r["cost"]
+            tokens_by_day[r["d"]] = tokens_by_day.get(r["d"], 0) + (r["tok"] or 0)
+
+    # brokers crawled + Firecrawl pages (credits) per day, from broker_stats
+    crawl_by_day: dict[str, dict] = {}
+    for r in conn.execute(
+            "SELECT date(created_at) d, COUNT(DISTINCT broker) brokers, "
+            "COALESCE(SUM(pages),0) pages FROM broker_stats "
+            "WHERE created_at >= date('now', ?) GROUP BY date(created_at)",
+            (f"-{days} day",)).fetchall():
+        if r["d"]:
+            crawl_by_day[r["d"]] = {"brokers": r["brokers"], "firecrawl_pages": r["pages"]}
+
     # relevance split: evaluate each day's new listings against the thesis
     rel_by_day: dict[str, dict] = {}
     for l in conn.execute(
@@ -271,12 +295,16 @@ def spend(account: str = "water", days: int = 30):
         bucket = rel_by_day.setdefault(d, {"relevant": 0, "irrelevant": 0})
         bucket["relevant" if v["section"] == "in" else "irrelevant"] += 1
 
-    all_days = sorted(set(cost_by_day) | set(rel_by_day), reverse=True)
+    all_days = sorted(set(cost_by_day) | set(rel_by_day) | set(crawl_by_day), reverse=True)
     daily = []
     for d in all_days:
         c = cost_by_day.get(d, {"cost": 0.0})
         rel = rel_by_day.get(d, {"relevant": 0, "irrelevant": 0})
+        crawl = crawl_by_day.get(d, {"brokers": 0, "firecrawl_pages": 0})
         daily.append({"date": d, "cost": round(c["cost"], 4),
+                      "model_costs": model_by_day.get(d, {}),
+                      "claude_tokens": tokens_by_day.get(d, 0),
+                      "brokers": crawl["brokers"], "firecrawl_pages": crawl["firecrawl_pages"],
                       "relevant": rel["relevant"], "irrelevant": rel["irrelevant"],
                       "total_new": rel["relevant"] + rel["irrelevant"]})
 

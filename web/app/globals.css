@@ -144,6 +144,11 @@ a { color: inherit; }
 /* spend page: relevant/irrelevant mix bar (width = volume, green fill = relevant share) */
 .mixbar { display: inline-block; height: 10px; min-width: 24px; background: #e2e8f0; border-radius: 3px; overflow: hidden; vertical-align: middle; }
 .mixrel { display: block; height: 100%; background: #16a34a; border-radius: 3px 0 0 3px; }
+/* spend page: cost-by-model bar (segment widths = each model's share of the day's Claude cost) */
+.modelbar { display: flex; height: 11px; width: 100%; min-width: 60px; border-radius: 3px; overflow: hidden; background: var(--line-2); }
+.modelbar > span { height: 100%; }
+.modellegend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12px; color: var(--muted); margin-top: 10px; }
+.modellegend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: middle; margin-right: 5px; }
 
 /* how-it-works page */
 .pipeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 22px; }

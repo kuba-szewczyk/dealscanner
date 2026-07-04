@@ -115,7 +115,10 @@ CREATE TABLE IF NOT EXISTS runs (
     listings_processed INTEGER,
     new_count          INTEGER,
     cost_usd           REAL DEFAULT 0,
-    note               TEXT
+    note               TEXT,
+    model              TEXT,                    -- Claude model used (per-model spend breakdown)
+    in_tokens          INTEGER,                 -- Claude input tokens
+    out_tokens         INTEGER                  -- Claude output tokens
 );
 
 -- content-hash -> result so re-runs/re-scores never double-pay.
@@ -186,6 +189,11 @@ _ADD_COLUMNS = {
         "block_count": "INTEGER DEFAULT 0",   # Firecrawl-blocked pages seen for this broker
         "last_blocked_at": "TEXT",
         "last_block_reason": "TEXT",
+    },
+    "runs": {
+        "model": "TEXT",          # Claude model for this run (per-model spend breakdown)
+        "in_tokens": "INTEGER",   # Claude input tokens
+        "out_tokens": "INTEGER",  # Claude output tokens
     },
 }
 
