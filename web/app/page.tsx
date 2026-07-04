@@ -101,12 +101,15 @@ export default function Board() {
     return true;
   };
 
+  // The vote filter only applies when signed in — its control is hidden otherwise, so a
+  // stale "voted/unvoted" selection must never silently change the logged-out board.
+  const effVoteFilter = signedIn ? voteFilter : "all";
   const filtered = useMemo(() => deals.filter((d: any) => {
     const isVoted = d.id in voted;
-    if (voteFilter === "voted" && !isVoted) return false;
-    if (voteFilter === "unvoted" && isVoted) return false;
+    if (effVoteFilter === "voted" && !isVoted) return false;
+    if (effVoteFilter === "unvoted" && isVoted) return false;
     return dateOK(d.first_seen);
-  }), [deals, voted, voteFilter, lo, hi]);
+  }), [deals, voted, effVoteFilter, lo, hi]);
 
   const groups = [5, 4, 3, 2].map((c) => ({ c, items: filtered.filter((d) => d.relevance === c) })).filter((g) => g.items.length);
 
