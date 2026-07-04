@@ -22,9 +22,33 @@
   --red-soft: #fdecea;
   --water: #0e7c86;
   --health: #4f46e5;
+  --desk-bg: rgba(255,255,255,.85);
   --radius: 10px;
   --maxw: 1120px;
   --shadow: 0 1px 2px rgba(16,24,40,.04), 0 4px 16px -8px rgba(16,24,40,.12);
+}
+
+/* Dark mode — follows the OS setting (unless the root is pinned to light). Neutral
+   surfaces/text/lines flip; saturated accents (blue/good/amber/red, category chips)
+   stay as-is since they read on both. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #e8edf5;
+    --ink-2: #c3ccd9;
+    --muted: #9aa5b5;
+    --faint: #7f8a9a;
+    --bg: #0f1420;
+    --surface: #171d2b;
+    --panel: #1c2333;
+    --line: #2a3346;
+    --line-2: #222a3a;
+    --blue-soft: #1a2540;
+    --good-soft: #12251c;
+    --red-soft: #2c1a1a;
+    --desk-bg: rgba(15,20,32,.85);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px -10px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -38,7 +62,7 @@ a { color: inherit; }
 .num { font-variant-numeric: tabular-nums; }
 
 /* ---------- top bar ---------- */
-.desk { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.85);
+.desk { position: sticky; top: 0; z-index: 20; background: var(--desk-bg);
   backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .desk-inner { max-width: var(--maxw); margin: 0 auto; padding: 13px 24px; display: flex; align-items: center; gap: 22px; }
 .brand { text-decoration: none; color: inherit; display: block; }
@@ -148,6 +172,12 @@ th.r .sortbtn { flex-direction: row-reverse; }
 .modal-x:hover { color: var(--ink); }
 .modal .deal { cursor: default; }
 .matches { font-size: 12px; font-weight: 600; color: var(--muted); }
+/* first-run orientation banner */
+.intro { display: flex; align-items: flex-start; gap: 12px; background: var(--blue-soft); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.intro a { color: var(--blue); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.intro-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 2px; margin-left: auto; }
+.intro-x:hover { color: var(--ink); }
 .capcell::-webkit-scrollbar { height: 4px; }
 .capcell::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
 .dbtable td.nowrap, .dbtable .nowrap { white-space: nowrap; }

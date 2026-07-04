@@ -47,6 +47,9 @@ export default function Board() {
   const [voteFilter, setVoteFilter] = useState("all");   // all | voted | unvoted
   const [period, setPeriod] = useState("24h");           // all | 24h | 7d | 30d | custom
   const [signedIn, setSignedIn] = useState(false);       // gate the vote UI on auth
+  const [showIntro, setShowIntro] = useState(false);
+  useEffect(() => { setShowIntro(typeof window !== "undefined" && localStorage.getItem("ds_intro_hidden") !== "1"); }, []);
+  function dismissIntro() { localStorage.setItem("ds_intro_hidden", "1"); setShowIntro(false); }
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
   const [nonqual, setNonqual] = useState<any[]>([]);     // out / too_small / excluded
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({}); // per-category fold (default collapsed)
@@ -62,11 +65,14 @@ export default function Board() {
     api.me().then((d) => setSignedIn(!!d.email)).catch(() => setSignedIn(false));
   }, []);
 
+  const [lastScan, setLastScan] = useState<string | null>(null);
   useEffect(() => {
     setLoading(true);
     Promise.all([api.board(thesis), api.runs(), api.votesList(),
                  api.board(thesis, "out,too_small,excluded", 5000)]).then(([b, r, vl, nq]) => {
       setDeals(b.listings); setSpend(r.total_spend_usd); setNonqual(nq.listings);
+      const scrapes = (r.runs || []).filter((x: any) => x.kind === "scrape");
+      setLastScan(scrapes[0]?.started_at || null);
       const m: Record<number, string> = {};
       (vl.votes || []).forEach((x: any) => { if (x.thesis === thesis && !(x.listing_id in m)) m[x.listing_id] = x.verdict; });
       setVoted(m); setLoading(false);
@@ -130,6 +136,13 @@ export default function Board() {
 
   return (
     <main className="wrap">
+      {showIntro && !signedIn && (
+        <div className="intro">
+          <span><b>DealScanner</b> aggregates business-for-sale listings from 200+ brokers into one thesis-filtered feed for searchers.
+            This is the <b>{LABEL[thesis]}</b> board — new deals that clear that thesis. <a href="/help">How it works →</a></span>
+          <button className="intro-x" onClick={dismissIntro} aria-label="Dismiss">✕</button>
+        </div>
+      )}
       <div className="boardhead">
         <h1 className="h1">{LABEL[thesis]} deals</h1>
         <p className="sub">New businesses that match your acquisition thesis, ranked by fit and refreshed daily. Switch thesis to re-score the same listings.</p>
@@ -165,12 +178,15 @@ export default function Board() {
             )}
           </div>
         </div>
-        <div className="cost"><b>{loading ? "…" : filtered.length}</b>{!loading && filtered.length !== deals.length ? ` of ${deals.length}` : ""} qualifying</div>
+        <div className="cost"><b>{loading ? "…" : filtered.length}</b>{!loading && filtered.length !== deals.length ? ` of ${deals.length}` : ""} qualifying{lastScan ? ` · last scan ${fmtDate(lastScan)}` : ""}</div>
       </div>
 
       {loading && <p className="note">Loading deals…</p>}
       {!loading && filtered.length === 0 && (
-        <div className="panel note">No deals match these filters. Widen the date window, or adjust the keywords and size band under Thesis.</div>
+        <div className="panel note">
+          The scan ran{lastScan ? ` (last: ${fmtDate(lastScan)})` : ""} — nothing new cleared the {LABEL[thesis]} thesis in this window.
+          Widen the date range above, or adjust the keywords and size band under Thesis.
+        </div>
       )}
 
       {groups.map((g) => (
