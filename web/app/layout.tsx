@@ -43,10 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="desk">
           <div className="desk-inner">
-            <div>
+            <Link href="/" className="brand" aria-label="DealScanner — go to Deals">
               <div className="wordmark">Deal<b>Scanner</b></div>
               <div className="tag-sub">deal sourcing</div>
-            </div>
+            </Link>
             <div className="spacer" />
             <nav className="nav">
               <Link href="/">Deals</Link>

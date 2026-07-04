@@ -39,6 +39,7 @@ a { color: inherit; }
 .desk { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.85);
   backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .desk-inner { max-width: var(--maxw); margin: 0 auto; padding: 13px 24px; display: flex; align-items: center; gap: 22px; }
+.brand { text-decoration: none; color: inherit; display: block; }
 .wordmark { font-weight: 800; font-size: 16px; letter-spacing: -0.02em; color: var(--ink); }
 .wordmark b { color: var(--blue); font-weight: 800; }
 .tag-sub { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
