@@ -111,6 +111,39 @@ def _geo_match(listing: dict, geo: dict) -> bool:
     return _norm_state(listing.get("state")) in set(geo.get("tier2_states", []))
 
 
+def _sane_money(v):
+    """Reject implausible extracted figures: bare years (1900-2100) and sub-$1k values that
+    are almost always mis-parses (e.g. a year read as SDE, or '49')."""
+    if v is None:
+        return None
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    if v < 1000:                 # no real target business earns/asks < $1k
+        return None
+    if 1900 <= v <= 2100:        # a bare year mistaken for dollars
+        return None
+    return v
+
+
+def _size_status(l: dict, size: dict) -> str:
+    """'ok' = known financials inside the band; 'small' = known but below band or ask/rev
+    under the floor; 'unknown' = no usable financials. Only 'ok' is a perfect (qualifying) fit."""
+    ask, rev = _sane_money(l.get("asking_price")), _sane_money(l.get("revenue"))
+    eb, sde = _sane_money(l.get("ebitda")), _sane_money(l.get("sde"))
+    floor = size.get("reject_below_ask", 1_000_000)
+    if (ask is not None and ask < floor) or (rev is not None and rev < floor):
+        return "small"
+    eb_ok = eb is not None and size.get("ebitda_min", 0) <= eb <= size.get("ebitda_max", 1e12)
+    sde_ok = sde is not None and size.get("sde_min", 1e12) <= sde <= size.get("sde_max", 1e15)
+    if eb_ok or sde_ok:
+        return "ok"
+    if eb is None and sde is None:
+        return "unknown"
+    return "small"
+
+
 def _size_ok(l: dict, size: dict) -> bool:
     ask, rev, eb, sde = l.get("asking_price"), l.get("revenue"), l.get("ebitda"), l.get("sde")
     floor = size.get("reject_below_ask", 1_000_000)
@@ -224,22 +257,19 @@ def evaluate(listing: dict, settings: dict, today: Optional[str] = None) -> dict
     if listing.get("is_sold"):
         section = "sold"
     elif _excluded_by_tags(listing, settings) or _excluded(text, settings):
-        section = "excluded"
+        section = "excluded"                  # off-category (tags or exclude_terms) -> out of scope
     elif freshness == "stale":
         section = "stale"
-    elif not _size_ok(listing, settings.get("size", {})):
-        section = "too_small"
-    elif relevance >= 2:
-        # Optional geo gate: when geo.require is on, a keyword+size match still only
-        # qualifies if it is in a target metro/state. Off-geo (and unplaceable) deals
-        # are held out of the board — they are the queue the detail-screening pass works.
-        geo = settings.get("geo", {})
-        if geo.get("require") and not _geo_match(listing, geo):
-            section = "off_geo"
-        else:
-            section = "in"
+    elif relevance < 2:
+        section = "out"                       # not on-thesis -> out of scope
     else:
-        section = "out"
+        # On-thesis. 'in' (perfect) needs in-band financials AND (if the thesis gates on
+        # geography) a geo match. Everything else on-thesis is 'near' — in the category and
+        # worth seeing, just not clearing the bar (small, unknown financials, or off-geo).
+        geo = settings.get("geo", {})
+        geo_ok = not (geo.get("require") and not _geo_match(listing, geo))
+        size_status = _size_status(listing, settings.get("size", {}))
+        section = "in" if (geo_ok and size_status == "ok") else "near"
 
     w = settings.get("ranking", {}).get("weights", {"relevance": 2.0, "flag_score": 1.0})
     fit_score = relevance * w.get("relevance", 2.0) + flag_score * w.get("flag_score", 1.0)
@@ -248,7 +278,7 @@ def evaluate(listing: dict, settings: dict, today: Optional[str] = None) -> dict
         tier = "A"
     elif section == "in":
         tier = "B"
-    elif section in ("too_small", "out"):
+    elif section == "near":
         tier = "C"
     else:
         tier = section.upper()

@@ -161,8 +161,12 @@ def _geo_settings(require):
         "geo": {"require": require, "tier1_metros": ["new york", "miami"], "tier2_states": ["CA", "MA"]},
     }
 
-def _listing(state, city="", ft=""):
-    return {"business_name": "A concierge medicine practice", "state": state, "city": city, "full_text": ft}
+def _listing(state, city="", ft="", eb=2_000_000):
+    # in-band ebitda by default so the ONLY variable under test is geography
+    l = {"business_name": "A concierge medicine practice", "state": state, "city": city, "full_text": ft}
+    if eb is not None:
+        l["ebitda"] = eb
+    return l
 
 def test_geo_gate_off_qualifies_anywhere():
     v = evaluator.evaluate(_listing("OH"), _geo_settings(False))
@@ -176,9 +180,19 @@ def test_geo_gate_on_allows_metro_in_text():
     v = evaluator.evaluate(_listing("", city="Miami"), _geo_settings(True))
     assert v["section"] == "in"
 
-def test_geo_gate_on_holds_out_offgeo_and_unknown():
-    assert evaluator.evaluate(_listing("OH"), _geo_settings(True))["section"] == "off_geo"
-    assert evaluator.evaluate(_listing(""), _geo_settings(True))["section"] == "off_geo"
+def test_geo_gate_off_geo_is_near_not_qualifying():
+    # on-thesis + in-band but wrong geography -> 'near' (in the category, doesn't clear the bar)
+    assert evaluator.evaluate(_listing("OH"), _geo_settings(True))["section"] == "near"
+    assert evaluator.evaluate(_listing(""), _geo_settings(True))["section"] == "near"
+
+def test_relevant_unknown_financials_is_near():
+    # on-thesis but no usable financials -> 'near', never a perfect 'in'
+    assert evaluator.evaluate(_listing("CA", eb=None), _geo_settings(False))["section"] == "near"
+
+def test_implausible_financials_ignored():
+    # a bare year or sub-$1k figure must not be treated as real earnings
+    assert evaluator._sane_money(2026) is None and evaluator._sane_money(49) is None
+    assert evaluator._sane_money(2_500_000) == 2_500_000
 
 def test_norm_state():
     assert evaluator._norm_state("California") == "CA"
@@ -194,12 +208,12 @@ def test_exclude_terms_forces_out_even_with_keyword_hit():
                       "negative": [], "exclude_terms": ["dental", "veterinary"]},
          "size": {}, "flags": {"positive": [], "negative": []}}
     # a dental practice that also says "primary care" is still excluded
-    hit = evaluator.evaluate({"business_name": "Family dental & primary care", "state": "CA"}, s)
+    hit = evaluator.evaluate({"business_name": "Family dental & primary care", "state": "CA", "ebitda": 2_000_000}, s)
     assert hit["section"] == "excluded"
-    ok = evaluator.evaluate({"business_name": "Primary care clinic", "state": "CA"}, s)
+    ok = evaluator.evaluate({"business_name": "Primary care clinic", "state": "CA", "ebitda": 2_000_000}, s)
     assert ok["section"] == "in"
 
 def test_exclude_terms_absent_is_noop():
     s = {"keywords": {"tier1": ["primary care"], "context": [], "tier2": [], "negative": []},
          "size": {}, "flags": {"positive": [], "negative": []}}
-    assert evaluator.evaluate({"business_name": "Primary care", "state": "CA"}, s)["section"] == "in"
+    assert evaluator.evaluate({"business_name": "Primary care", "state": "CA", "ebitda": 2_000_000}, s)["section"] == "in"

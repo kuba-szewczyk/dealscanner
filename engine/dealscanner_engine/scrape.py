@@ -171,9 +171,13 @@ def _parse_array(raw: str) -> list[dict]:
 
 def _num(v):
     try:
-        return float(v) if v not in (None, "") else None
+        f = float(v) if v not in (None, "") else None
     except (TypeError, ValueError):
         return None
+    # Reject implausible extractions: bare years (a "2026" read as SDE) and sub-$1k figures.
+    if f is not None and (f < 1000 or 1900 <= f <= 2100):
+        return None
+    return f
 
 
 def _today() -> str:

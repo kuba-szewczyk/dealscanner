@@ -66,11 +66,13 @@ export default function Board() {
   }, []);
 
   const [lastScan, setLastScan] = useState<string | null>(null);
+  const [near, setNear] = useState<any[]>([]);   // on-thesis, doesn't clear the bar
   useEffect(() => {
     setLoading(true);
     Promise.all([api.board(thesis), api.runs(), api.votesList(),
-                 api.board(thesis, "out,too_small,excluded", 5000)]).then(([b, r, vl, nq]) => {
-      setDeals(b.listings); setSpend(r.total_spend_usd); setNonqual(nq.listings);
+                 api.board(thesis, "out,excluded,stale", 5000),
+                 api.board(thesis, "near", 300)]).then(([b, r, vl, nq, nr]) => {
+      setDeals(b.listings); setSpend(r.total_spend_usd); setNonqual(nq.listings); setNear(nr.listings);
       const scrapes = (r.runs || []).filter((x: any) => x.kind === "scrape");
       setLastScan(scrapes[0]?.started_at || null);
       const m: Record<number, string> = {};
@@ -125,6 +127,14 @@ export default function Board() {
   }), [deals, voted, effVoteFilter, lo, hi]);
 
   const groups = [5, 4, 3, 2].map((c) => ({ c, items: filtered.filter((d) => d.relevance === c) })).filter((g) => g.items.length);
+
+  // On-thesis but doesn't clear the bar (small / undisclosed financials / off-geo).
+  const nearFiltered = useMemo(() => near.filter((d: any) => {
+    const isVoted = d.id in voted;
+    if (effVoteFilter === "voted" && !isVoted) return false;
+    if (effVoteFilter === "unvoted" && isVoted) return false;
+    return dateOK(d.first_seen);
+  }), [near, voted, effVoteFilter, lo, hi]);
 
   // Non-qualifying deals (didn't pass keyword/size/exclusion), grouped by category.
   const nqGroups = useMemo(() => {
@@ -182,13 +192,22 @@ export default function Board() {
       </div>
 
       {loading && <p className="note">Loading deals…</p>}
-      {!loading && filtered.length === 0 && (
+      {!loading && filtered.length === 0 && nearFiltered.length === 0 && (
         <div className="panel note">
-          The scan ran{lastScan ? ` (last: ${fmtDate(lastScan)})` : ""} — nothing new cleared the {LABEL[thesis]} thesis in this window.
+          The scan ran{lastScan ? ` (last: ${fmtDate(lastScan)})` : ""} — nothing in the {LABEL[thesis]} category in this window.
           Widen the date range above, or adjust the keywords and size band under Thesis.
         </div>
       )}
+      {!loading && filtered.length === 0 && nearFiltered.length > 0 && (
+        <div className="panel note">
+          No perfect-fit deals in this window, but {nearFiltered.length} on-thesis {nearFiltered.length === 1 ? "deal is" : "deals are"} below —
+          worth a look even though the financials or size don’t fully clear the bar.
+        </div>
+      )}
 
+      {groups.length > 0 && (
+        <div className="tierlabel">Qualifying <span>— clears your thesis and size band</span></div>
+      )}
       {groups.map((g) => (
         <section key={g.c}>
           <div className="section-head">
@@ -200,12 +219,21 @@ export default function Board() {
         </section>
       ))}
 
+      {!loading && nearFiltered.length > 0 && (
+        <section>
+          <div className="tierlabel">In the {LABEL[thesis]} category <span>— on-thesis, but small, undisclosed financials, or outside the size band</span></div>
+          {nearFiltered.map((d: any) => (
+            <DealCard key={d.id} d={d} signedIn={signedIn} voted={voted[d.id]} onVote={(v) => cast(d, v)} />
+          ))}
+        </section>
+      )}
+
       {!loading && nqGroups.total > 0 && (
         <section className="nqwrap">
           <div className="nqhead">
-            <b>Didn’t qualify</b>
+            <b>Out of scope</b>
             <span className="n">{nqGroups.total}</span>
-            <span className="nqhint">scored from the same scrape but filtered out by keywords, size or exclusions{period !== "all" ? " · this window" : ""} — open a category to see them</span>
+            <span className="nqhint">scraped but not in the {LABEL[thesis]} category — filtered out by keywords or exclusions{period !== "all" ? " · this window" : ""} — open a category to see them</span>
           </div>
           <div className="nqbody">
             {nqGroups.cats.map(([cat, items]) => {

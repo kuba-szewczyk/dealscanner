@@ -178,6 +178,10 @@ th.r .sortbtn { flex-direction: row-reverse; }
 .intro a { color: var(--blue); font-weight: 600; text-decoration: none; white-space: nowrap; }
 .intro-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 2px; margin-left: auto; }
 .intro-x:hover { color: var(--ink); }
+/* board tier separators (Qualifying / In-category / Out of scope) */
+.tierlabel { font-size: 13px; font-weight: 700; color: var(--ink); margin: 22px 0 8px; }
+.tierlabel span { font-weight: 500; color: var(--muted); }
+.tierlabel:first-of-type { margin-top: 6px; }
 .capcell::-webkit-scrollbar { height: 4px; }
 .capcell::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
 .dbtable td.nowrap, .dbtable .nowrap { white-space: nowrap; }
