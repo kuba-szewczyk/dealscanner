@@ -99,7 +99,7 @@ keywords:
 geo:
   # require: qualify ONLY in a target metro/state. Off-metro and unplaceable deals are
   # held out (section 'off_geo'). Set require:false to score primary care nationwide.
-  require: true
+  require: false
   tier1_metros: [new york, manhattan, brooklyn, los angeles, san francisco, san jose,
     palo alto, beverly hills, santa monica, newport beach, boston, cambridge, miami,
     miami beach, palm beach, naples, chicago, seattle, washington dc, greenwich,
