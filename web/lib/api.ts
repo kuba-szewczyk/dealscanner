@@ -20,7 +20,7 @@ export const api = {
   runs: () => get("/runs"),
   search: (q: string, sort = "accuracy") => get(`/search?q=${encodeURIComponent(q)}&sort=${sort}`),
   activity: (hours = 24) => get(`/activity?hours=${hours}`),
-  spend: (account: string, days = 30) => get(`/spend?account=${account}&days=${days}`),
+  spend: (days = 30) => get(`/spend?days=${days}`),
   listing: (id: number, account?: string) => get(`/listing?id=${id}${account ? `&account=${account}` : ""}`),
   brokers: () => get("/brokers"),
   logs: () => get("/logs"),

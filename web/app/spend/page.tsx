@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
-const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
 const money = (v: number) => `$${(v ?? 0).toFixed(2)}`;
 function fmtDay(s: string) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
@@ -12,7 +11,7 @@ function fmtDay(s: string) {
 }
 
 type Day = {
-  date: string; cost: number; relevant: number; irrelevant: number; total_new: number;
+  date: string; cost: number; total_new: number;
   model_costs: Record<string, number>; claude_tokens: number; brokers: number; firecrawl_pages: number;
 };
 
@@ -26,29 +25,21 @@ const modelMeta = (m: string) => MODEL_META[m] || { name: m.replace("claude-", "
 const fmtTok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}k` : `${n}`);
 
 export default function Spend() {
-  const [thesis, setThesis] = useState("water");
   const [summary, setSummary] = useState({ cost_24h: 0, cost_7d: 0, cost_30d: 0 });
   const [daily, setDaily] = useState<Day[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    api.spend(thesis, 30).then((d) => { setSummary(d.summary); setDaily(d.daily); setLoading(false); });
-  }, [thesis]);
+    api.spend(30).then((d) => { setSummary(d.summary); setDaily(d.daily); setLoading(false); });
+  }, []);
 
   return (
     <main className="wrap">
       <div className="boardhead">
         <h1 className="h1">Spend</h1>
-        <p className="sub">What the engine costs versus what it finds — day by day. Costs are shared across theses;
-          the relevant / not-relevant split reflects the thesis selected here.</p>
-        <div className="lens" role="group" aria-label="Thesis">
-          {["water", "healthcare"].map((t) => (
-            <button key={t} className={t} aria-pressed={thesis === t} onClick={() => setThesis(t)}>
-              <span className="dot" />{LABEL[t]}
-            </button>
-          ))}
-        </div>
+        <p className="sub">What the engine costs versus what it finds — day by day. One shared scrape feeds
+          every thesis, so cost, coverage, and usage are the same regardless of which thesis you&apos;re viewing.</p>
       </div>
 
       <div className="statrow">
@@ -70,8 +61,6 @@ export default function Spend() {
                 <th>Cost by model</th>
                 <th className="r">Brokers</th>
                 <th className="r">New listings</th>
-                <th className="r">Relevant</th>
-                <th className="r">Not relevant</th>
                 <th className="r">Firecrawl</th>
               </tr>
             </thead>
@@ -94,8 +83,6 @@ export default function Spend() {
                     </td>
                     <td className="r">{d.brokers || "—"}</td>
                     <td className="r">{d.total_new}</td>
-                    <td className="r"><b style={{ color: "#15803d" }}>{d.relevant}</b></td>
-                    <td className="r muted">{d.irrelevant}</td>
                     <td className="r muted">{d.firecrawl_pages ? `${d.firecrawl_pages} pg` : "—"}</td>
                   </tr>
                 );
@@ -108,7 +95,7 @@ export default function Spend() {
         {Object.entries(MODEL_META).map(([m, meta]) => (
           <span key={m}><i style={{ background: meta.c }} />{meta.name}</span>
         ))}
-        <span className="muted">· “Cost by model” shows what drove each day’s Claude spend. “Firecrawl” = pages fetched (credits). Green = deals that clear the {LABEL[thesis]} thesis.</span>
+        <span className="muted">· “Cost by model” shows what drove each day’s Claude spend; hover for tokens. “Firecrawl” = pages fetched (credits).</span>
       </div>
     </main>
   );

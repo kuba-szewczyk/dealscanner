@@ -253,15 +253,10 @@ def get_listing(id: int, account: str | None = None):
 
 
 @app.get("/spend")
-def spend(account: str = "water", days: int = 30):
-    """Day-by-day engine spend vs listings gained, split relevant/irrelevant for the
-    selected thesis. Cost is thesis-independent (one shared scrape); the relevant split
-    applies that thesis's CURRENT settings to each day's new listings, like the board."""
+def spend(days: int = 30):
+    """Day-by-day engine spend vs listings gained. Thesis-independent — there is one
+    shared scrape, so cost / brokers / Firecrawl / new-listings don't vary by thesis."""
     conn = db.connect()
-    try:
-        settings = thesis.get_settings(conn, account)
-    except KeyError:
-        raise HTTPException(404, f"unknown account '{account}'")
 
     # cost + raw new-count per day from the runs ledger
     cost_by_day: dict[str, dict] = {}
@@ -297,36 +292,31 @@ def spend(account: str = "water", days: int = 30):
         if r["d"]:
             crawl_by_day[r["d"]] = {"brokers": r["brokers"], "firecrawl_pages": r["pages"]}
 
-    # relevance split: evaluate each day's new listings against the thesis
-    rel_by_day: dict[str, dict] = {}
-    for l in conn.execute(
-            "SELECT * FROM listings WHERE date(first_seen) >= date('now', ?)",
+    # new listings per day (thesis-independent count straight from the corpus)
+    new_by_day: dict[str, int] = {}
+    for r in conn.execute(
+            "SELECT date(first_seen) d, COUNT(*) n FROM listings "
+            "WHERE date(first_seen) >= date('now', ?) GROUP BY date(first_seen)",
             (f"-{days} day",)).fetchall():
-        d = (l["first_seen"] or "")[:10]
-        if not d:
-            continue
-        v = evaluator.evaluate(dict(l), settings)
-        bucket = rel_by_day.setdefault(d, {"relevant": 0, "irrelevant": 0})
-        bucket["relevant" if v["section"] == "in" else "irrelevant"] += 1
+        if r["d"]:
+            new_by_day[r["d"]] = r["n"]
 
-    all_days = sorted(set(cost_by_day) | set(rel_by_day) | set(crawl_by_day), reverse=True)
+    all_days = sorted(set(cost_by_day) | set(new_by_day) | set(crawl_by_day), reverse=True)
     daily = []
     for d in all_days:
         c = cost_by_day.get(d, {"cost": 0.0})
-        rel = rel_by_day.get(d, {"relevant": 0, "irrelevant": 0})
         crawl = crawl_by_day.get(d, {"brokers": 0, "firecrawl_pages": 0})
         daily.append({"date": d, "cost": round(c["cost"], 4),
                       "model_costs": model_by_day.get(d, {}),
                       "claude_tokens": tokens_by_day.get(d, 0),
                       "brokers": crawl["brokers"], "firecrawl_pages": crawl["firecrawl_pages"],
-                      "relevant": rel["relevant"], "irrelevant": rel["irrelevant"],
-                      "total_new": rel["relevant"] + rel["irrelevant"]})
+                      "total_new": new_by_day.get(d, 0)})
 
     def window_cost(n):
         return round(sum(v["cost"] for k, v in cost_by_day.items()
                          if k >= _days_ago(n)), 4)
     summary = {"cost_24h": window_cost(1), "cost_7d": window_cost(7), "cost_30d": window_cost(30)}
-    return {"account": account, "summary": summary, "daily": daily}
+    return {"summary": summary, "daily": daily}
 
 
 def _days_ago(n: int) -> str:
