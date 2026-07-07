@@ -151,6 +151,8 @@ CREATE TABLE IF NOT EXISTS broker_sources (
     block_count     INTEGER DEFAULT 0,           -- times Firecrawl was blocked on this broker's pages
     last_blocked_at TEXT,                         -- when last blocked (Firecrawl can't load the page)
     last_block_reason TEXT,
+    last_link_hash  TEXT,                         -- fingerprint of the last-extracted page
+    last_extracted_at TEXT,                       -- when we last ran the LLM extraction on it
     created_at      TEXT
 );
 """
@@ -189,6 +191,8 @@ _ADD_COLUMNS = {
         "block_count": "INTEGER DEFAULT 0",   # Firecrawl-blocked pages seen for this broker
         "last_blocked_at": "TEXT",
         "last_block_reason": "TEXT",
+        "last_link_hash": "TEXT",             # fingerprint of last-extracted page (skip if unchanged)
+        "last_extracted_at": "TEXT",
     },
     "runs": {
         "model": "TEXT",          # Claude model for this run (per-model spend breakdown)

@@ -158,3 +158,50 @@ def test_live_brokers_excludes_dead_and_empty_url(conn):
     conn.execute("INSERT INTO broker_sources(name, url, status) VALUES ('NoUrl','','live')")
     conn.commit()
     assert [n for n, _ in scrape.live_brokers(conn)] == ["Live"]
+
+
+# ---- change-detection: skip the LLM call on unchanged pages ----
+
+_P4 = ("# Businesses for sale across the region this quarter\n" +
+       "\n".join(f"[More](https://b.com/listing/{i}) profitable company with strong cash flow" for i in range(4)))
+_P5 = ("# Businesses for sale across the region this quarter\n" +
+       "\n".join(f"[More](https://b.com/listing/{i}) profitable company with strong cash flow" for i in range(5)))
+
+
+def test_page_fingerprint_ignores_volatile_text_and_catches_new_links():
+    a = _P4 + "\nposted 3 days ago"
+    b = _P4 + "\nposted 9 days ago · 402 views · sponsored"
+    assert scrape._page_fingerprint(a, "https://b.com/l") == scrape._page_fingerprint(b, "https://b.com/l")
+    assert scrape._page_fingerprint(_P5, "https://b.com/l") != scrape._page_fingerprint(_P4, "https://b.com/l")
+    assert scrape._page_fingerprint("no links here at all", "https://b.com/l") is None
+
+
+def test_scrape_one_skips_llm_when_page_unchanged(monkeypatch, conn):
+    conn.execute("INSERT INTO broker_sources(name, url, status) VALUES ('B','https://b.com/listings','live')")
+    conn.commit()
+    card = [{"listing_url": "https://b.com/listing/0", "business_name": "Water Co", "industry": "Water"}]
+    client = _Client(card)
+    _patch_fetch(monkeypatch, md=_P4)
+    monkeypatch.setattr(scrape, "_today", lambda: "2026-06-23")
+    r1 = scrape.scrape_one("B", "https://b.com/listings", conn, client, {})
+    assert not r1.get("unchanged") and r1["cost_usd"] > 0
+    assert conn.execute("SELECT last_link_hash FROM broker_sources WHERE name='B'").fetchone()["last_link_hash"]
+
+    # identical page next day -> skip the LLM call, but keep listings fresh
+    monkeypatch.setattr(scrape, "_today", lambda: "2026-06-24")
+    r2 = scrape.scrape_one("B", "https://b.com/listings", conn, client, {})
+    assert r2.get("unchanged") is True and r2["cost_usd"] == 0.0
+    assert conn.execute("SELECT last_seen FROM listings LIMIT 1").fetchone()["last_seen"] == "2026-06-24"
+
+
+def test_scrape_one_reextracts_when_links_change(monkeypatch, conn):
+    conn.execute("INSERT INTO broker_sources(name, url, status) VALUES ('B','https://b.com/listings','live')")
+    conn.commit()
+    client = _Client([{"listing_url": "https://b.com/listing/0", "business_name": "X", "industry": "Water"}])
+    monkeypatch.setattr(scrape, "_today", lambda: "2026-06-23")
+    _patch_fetch(monkeypatch, md=_P4)
+    scrape.scrape_one("B", "https://b.com/listings", conn, client, {})
+    # a new listing link appears -> fingerprint changes -> must re-extract, not skip
+    _patch_fetch(monkeypatch, md=_P5)
+    r = scrape.scrape_one("B", "https://b.com/listings", conn, client, {})
+    assert not r.get("unchanged")

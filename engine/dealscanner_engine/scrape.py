@@ -184,6 +184,33 @@ def _today() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
 
+_URL_RE = re.compile(r'https?://[^\s()<>"\'\]]+')
+# A broker page never re-extracted in this many days is refreshed anyway, so a page can't
+# silently drift forever between full reads.
+REEXTRACT_DAYS = 7
+
+
+def _page_fingerprint(md: str, base_url: str) -> str | None:
+    """A stable signature of the LISTINGS on a page: the set of same-domain links it contains.
+    New/removed listings change the set; volatile text ('posted 3 days ago', ad copy) doesn't.
+    Returns None when the page has no own-domain links (can't fingerprint -> always extract)."""
+    host = urlparse(base_url).netloc.lower().replace("www.", "")
+    urls = {u.rstrip("/") for u in _URL_RE.findall(md or "")
+            if urlparse(u).netloc.lower().replace("www.", "") == host}
+    if not urls:
+        return None
+    return hashlib.sha1("\n".join(sorted(urls)).encode()).hexdigest()
+
+
+def _days_since(iso: str | None) -> float:
+    if not iso:
+        return 1e9
+    try:
+        return (datetime.now(timezone.utc) - datetime.fromisoformat(iso)).total_seconds() / 86400
+    except (ValueError, TypeError):
+        return 1e9
+
+
 def scrape_one(name: str, url: str, conn, client, excl: dict,
                max_pages: int = MAX_PAGES, ttl_hours: float | None = None) -> dict:
     """Scrape a single broker index (with pagination) -> upsert listings. One Haiku call."""
@@ -207,6 +234,31 @@ def scrape_one(name: str, url: str, conn, client, excl: dict,
         return {"broker": name, "cards": 0, "inserted": 0, "refreshed": 0, "tagged": 0,
                 "pages": pginfo["pages"], "chars_fed": min(len(md), CHAR_FEED),
                 "out_truncated": False, "cost_usd": 0.0, "dead": dead}
+
+    # Change detection: if the page's listing link-set is byte-identical to last time (and we
+    # extracted it recently), skip the LLM call entirely — the expensive 98% of a scrape that
+    # mostly re-reads unchanged pages. We still FETCHED the page above, so we KNOW it's unchanged.
+    fp = _page_fingerprint(md, url)
+    prev = conn.execute(
+        "SELECT last_link_hash, last_extracted_at FROM broker_sources WHERE name=?", (name,)).fetchone()
+    if (fp and prev and prev["last_link_hash"] == fp
+            and _days_since(prev["last_extracted_at"]) < REEXTRACT_DAYS):
+        now = datetime.now(timezone.utc).isoformat()
+        bumped = conn.execute("UPDATE listings SET last_seen=? WHERE broker=? AND is_sold=0",
+                              (_today(), name)).rowcount
+        note = f"{name}: unchanged — extraction skipped ({bumped} kept fresh), pages={pginfo['pages']}"
+        cur = conn.execute(
+            "INSERT INTO runs(kind, started_at, ended_at, listings_processed, new_count, cost_usd, note) "
+            "VALUES ('scrape',?,?,?,?,?,?)", (started, now, 0, 0, 0.0, note))
+        conn.execute(
+            "INSERT INTO broker_stats(run_id, broker, status, new_count, total_count, chars_fed, "
+            "pages, note, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (cur.lastrowid, name, "unchanged", 0, bumped, min(len(md), CHAR_FEED),
+             pginfo["pages"], note, now))
+        conn.commit()
+        return {"broker": name, "cards": 0, "inserted": 0, "refreshed": bumped, "tagged": 0,
+                "pages": pginfo["pages"], "chars_fed": min(len(md), CHAR_FEED),
+                "out_truncated": False, "cost_usd": 0.0, "unchanged": True}
 
     resp = client.messages.create(
         model=EXTRACT_MODEL, max_tokens=16000, system=_LISTINGS_SYSTEM,
@@ -281,6 +333,9 @@ def scrape_one(name: str, url: str, conn, client, excl: dict,
         (run_id, name, status, inserted, len(cards), chars_fed, pginfo["pages"], note,
          datetime.now(timezone.utc).isoformat()),
     )
+    # Remember this page's fingerprint so an identical page next time skips the LLM call.
+    conn.execute("UPDATE broker_sources SET last_link_hash=?, last_extracted_at=? WHERE name=?",
+                 (fp, datetime.now(timezone.utc).isoformat(), name))
     conn.commit()
     return {"broker": name, "cards": len(cards), "inserted": inserted, "refreshed": refreshed,
             "tagged": tagged, "pages": pginfo["pages"], "chars_fed": chars_fed,

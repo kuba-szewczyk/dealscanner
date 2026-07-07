@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
-# Daily pipeline: scrape everything fresh, email the digest, ping the dead-man
-# switch. The digest email is the human heartbeat; the healthchecks.io ping is
-# the machine one — if either goes quiet, the pipeline didn't run.
+# Daily pipeline: scrape (change-detected), enrich, email the digest. The digest email is the
+# human heartbeat; healthchecks.io is the machine one. We signal START, then SUCCESS or FAIL, so
+# a long-but-successful run (a full sweep can take ~an hour) is NOT mistaken for an outage —
+# healthchecks only alarms if the run doesn't COMPLETE, not if it runs long.
 set -euo pipefail
 cd /opt/dealscanner-v2
 
+# ping the dead-man switch; $1 is the endpoint suffix ("/start", "/fail", or "" for success).
+hc() {
+    [ -n "${HEALTHCHECK_URL:-}" ] || return 0
+    curl -fsS -m 10 --retry 3 "${HEALTHCHECK_URL}${1:-}" >/dev/null 2>&1 || true
+}
+trap 'hc /fail' ERR
+hc /start
+
 DSV2=engine/.venv/bin/dsv2
-# Production flow (from the recovered v2.5 cron): scrape every live broker fresh,
-# enrich newly-qualifying deals with financials, then email the per-thesis digest.
-# Both AI stages are spend-capped; caps are reviewed in deploy/README.md.
+# scrape-all only pays the LLM for pages whose listings actually changed (fingerprint skip),
+# so most days are cheap; enrich fills financials on newly-qualifying deals. Both spend-capped.
 $DSV2 scrape-all --fresh --max-usd "${SCRAPE_MAX_USD:-8.00}"
 $DSV2 enrich --max-usd "${ENRICH_MAX_USD:-3.00}"
 $DSV2 notify
 
-# HEALTHCHECK_URL comes from .env (systemd EnvironmentFile). Optional but wanted:
-# v2 died silently for days because nothing alerted on a missed run.
-if [ -n "${HEALTHCHECK_URL:-}" ]; then
-    curl -fsS -m 10 --retry 3 "$HEALTHCHECK_URL" >/dev/null
-fi
+hc   # success
