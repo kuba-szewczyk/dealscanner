@@ -94,6 +94,17 @@ export default function Settings() {
     if (code === 403) { location.href = "/login"; return; }
     if (code === 200) { loadArchived(); await reload(); setThesis(slug); }
   }
+  async function deleteThesis(slug: string, name: string) {
+    // Irreversible — require the operator to type the exact name to confirm.
+    const typed = prompt(`Permanently DELETE "${name}"?\n\nThis removes the thesis, its settings, and ALL its votes. This cannot be undone.\n\nType the thesis name to confirm:`);
+    if (typed == null) return;
+    if (typed.trim() !== name) { setMetaMsg("Name didn't match — nothing deleted."); return; }
+    const code = await api.deleteThesis(slug);
+    if (code === 403) { location.href = "/login"; return; }
+    if (code === 400) { setMetaMsg("Can't delete your only thesis."); return; }
+    if (code === 200) { await reload(); loadArchived(); setMetaMsg(null); }
+    else setMetaMsg("Couldn't delete — try again.");
+  }
   const lastEdited = acct?.updated_at ? new Date(acct.updated_at).toLocaleString() : null;
   const [tier1, setTier1] = useState(""); const [tier2, setTier2] = useState("");
   const [context, setContext] = useState(""); const [negative, setNegative] = useState("");
@@ -176,6 +187,7 @@ export default function Settings() {
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12, flexWrap: "wrap" }}>
           <button className="miniact" onClick={(e) => { e.stopPropagation(); saveMeta(); }}>Update</button>
           <button className="miniact ghost" onClick={(e) => { e.stopPropagation(); archiveThesis(); }} title="Hide this thesis and pause its digest (reversible)">Archive</button>
+          <button className="miniact danger" onClick={(e) => { e.stopPropagation(); if (acct) deleteThesis(thesis, acct.name); }} title="Permanently delete this thesis and its votes (cannot be undone)">Delete</button>
           {metaMsg && <span className="live">{metaMsg}</span>}
           {lastEdited && <span className="note" style={{ marginLeft: "auto" }}>Settings last edited {lastEdited}</span>}
         </div>
@@ -273,7 +285,10 @@ export default function Settings() {
                   <td>{a.name}</td>
                   <td className="muted">{a.owner_email || "—"}</td>
                   <td className="muted nowrap">{a.archived_at ? new Date(a.archived_at).toLocaleDateString() : "—"}</td>
-                  <td className="r"><button className="miniact ghost" onClick={() => unarchiveThesis(a.slug)}>Unarchive</button></td>
+                  <td className="r" style={{ whiteSpace: "nowrap" }}>
+                    <button className="miniact ghost" onClick={() => unarchiveThesis(a.slug)}>Unarchive</button>
+                    <button className="miniact danger" style={{ marginLeft: 6 }} onClick={() => deleteThesis(a.slug, a.name)}>Delete</button>
+                  </td>
                 </tr>
               ))}
             </tbody>

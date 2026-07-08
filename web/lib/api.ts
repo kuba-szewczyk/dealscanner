@@ -25,6 +25,8 @@ export const api = {
   },
   archiveThesis: (slug: string, archived: boolean) =>
     post(`/accounts/${slug}/archive`, { archived }).then((r) => r.status),
+  deleteThesis: (slug: string) =>
+    fetch(`${BASE}/accounts/${slug}`, { method: "DELETE", credentials: "include" }).then((r) => r.status),
   board: (account: string, sections = "in", limit = 200) =>
     get(`/board?account=${account}&sections=${sections}&limit=${limit}`),
   settings: (account: string) => get(`/settings/${account}`),

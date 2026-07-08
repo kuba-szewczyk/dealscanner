@@ -112,6 +112,23 @@ def archive_account(slug: str, request: Request, payload: dict = Body(...)):
     return {"ok": True, "archived": archived}
 
 
+@app.delete("/accounts/{slug}")
+def delete_account(slug: str, request: Request):
+    """Permanently delete a thesis and all its settings + votes. Irreversible.
+    Signed-in operators only; can't delete your last thesis."""
+    if not _signed_in(request):
+        raise HTTPException(403, "sign in required")
+    conn = db.connect()
+    total = conn.execute("SELECT COUNT(*) c FROM accounts").fetchone()["c"]
+    if total <= 1:
+        raise HTTPException(400, "can't delete your only thesis")
+    try:
+        thesis.delete_account(conn, slug)
+    except KeyError:
+        raise HTTPException(404, f"unknown thesis '{slug}'")
+    return {"ok": True, "deleted": slug}
+
+
 @app.get("/board")
 def get_board(account: str, date: str | None = None, sections: str = "in", limit: int = 100):
     conn = db.connect()

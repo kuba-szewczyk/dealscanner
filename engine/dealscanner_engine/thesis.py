@@ -96,6 +96,17 @@ def set_archived(conn: sqlite3.Connection, slug: str, archived: bool) -> None:
     conn.commit()
 
 
+def delete_account(conn: sqlite3.Connection, slug: str) -> None:
+    """Permanently delete a thesis and everything tied to it: its editable settings,
+    computed scores, score cache, and all its votes. Irreversible — the listings
+    themselves are thesis-neutral and untouched."""
+    aid = account_id_for(conn, slug)
+    for tbl in ("account_settings", "scores", "score_cache", "votes"):
+        conn.execute(f"DELETE FROM {tbl} WHERE account_id=?", (aid,))
+    conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
+    conn.commit()
+
+
 def load_yaml(path: Path) -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
