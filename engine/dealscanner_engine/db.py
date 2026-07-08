@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS accounts (
     slug        TEXT UNIQUE NOT NULL,          -- 'water', 'healthcare'
     name        TEXT NOT NULL,
     owner_email TEXT,
-    digest_emails TEXT                            -- comma-separated daily-digest recipients
+    digest_emails TEXT,                           -- comma-separated daily-digest recipients
+    archived    INTEGER DEFAULT 0,                -- soft-archive: hidden from lenses, digest paused, data kept
+    archived_at TEXT
 );
 
 -- The live, editable thesis config for an account (keywords, size bands, geo,
@@ -202,6 +204,8 @@ _ADD_COLUMNS = {
     },
     "accounts": {
         "digest_emails": "TEXT",  # comma-separated daily-digest recipients for this thesis
+        "archived": "INTEGER DEFAULT 0",  # soft-archive flag
+        "archived_at": "TEXT",
     },
 }
 

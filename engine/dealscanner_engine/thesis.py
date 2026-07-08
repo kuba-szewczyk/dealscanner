@@ -43,14 +43,15 @@ def slugify(name: str, conn: sqlite3.Connection) -> str:
     return slug
 
 
-def create_account(conn: sqlite3.Connection, name: str, digest_emails: str = "") -> str:
+def create_account(conn: sqlite3.Connection, name: str, digest_emails: str = "",
+                   owner_email: str | None = None) -> str:
     """Create a new thesis (account + blank editable settings). Returns its slug."""
     name = (name or "").strip()
     if not name:
         raise ValueError("thesis name is required")
     slug = slugify(name, conn)
-    conn.execute("INSERT INTO accounts(slug, name, digest_emails) VALUES (?,?,?)",
-                 (slug, name, digest_emails))
+    conn.execute("INSERT INTO accounts(slug, name, digest_emails, owner_email) VALUES (?,?,?,?)",
+                 (slug, name, digest_emails, owner_email))
     aid = conn.execute("SELECT id FROM accounts WHERE slug=?", (slug,)).fetchone()["id"]
     conn.execute("INSERT INTO account_settings(account_id, settings_json, updated_at) VALUES (?,?,?)",
                  (aid, json.dumps(BLANK_SETTINGS), _now()))
@@ -69,11 +70,30 @@ def update_account(conn: sqlite3.Connection, slug: str, name: str | None = None,
     conn.commit()
 
 
-def list_accounts(conn: sqlite3.Connection) -> list[dict]:
-    """All theses with display name, digest recipients, and when settings were last edited."""
+def list_accounts(conn: sqlite3.Connection, include_archived: bool = False) -> list[dict]:
+    """Active theses with display name, digest recipients, owner, and last-edited time.
+    Archived theses are excluded unless include_archived=True."""
+    where = "" if include_archived else "WHERE COALESCE(a.archived, 0) = 0"
     return [dict(r) for r in conn.execute(
-        "SELECT a.slug, a.name, COALESCE(a.digest_emails,'') digest_emails, s.updated_at "
-        "FROM accounts a LEFT JOIN account_settings s ON s.account_id = a.id ORDER BY a.id").fetchall()]
+        "SELECT a.slug, a.name, COALESCE(a.digest_emails,'') digest_emails, "
+        "COALESCE(a.owner_email,'') owner_email, COALESCE(a.archived,0) archived, "
+        "a.archived_at, s.updated_at "
+        f"FROM accounts a LEFT JOIN account_settings s ON s.account_id = a.id {where} ORDER BY a.id").fetchall()]
+
+
+def list_archived(conn: sqlite3.Connection) -> list[dict]:
+    """Archived theses only, for the restore list (name, owner, when archived)."""
+    return [dict(r) for r in conn.execute(
+        "SELECT slug, name, COALESCE(owner_email,'') owner_email, archived_at "
+        "FROM accounts WHERE COALESCE(archived,0) = 1 ORDER BY archived_at DESC").fetchall()]
+
+
+def set_archived(conn: sqlite3.Connection, slug: str, archived: bool) -> None:
+    """Soft-archive (or restore) a thesis. Keeps all settings and votes intact."""
+    aid = account_id_for(conn, slug)
+    conn.execute("UPDATE accounts SET archived=?, archived_at=? WHERE id=?",
+                 (1 if archived else 0, _now() if archived else None, aid))
+    conn.commit()
 
 
 def load_yaml(path: Path) -> dict:

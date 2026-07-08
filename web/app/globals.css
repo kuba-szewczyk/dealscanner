@@ -395,6 +395,7 @@ th.r .sortbtn { flex-direction: row-reverse; }
 .addform .field { margin: 0; flex: 1; min-width: 180px; }
 .miniact { font-size: 12px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 4px 11px; cursor: pointer; }
 .miniact:hover { color: var(--blue); border-color: var(--blue); }
+.miniact.ghost:hover { color: var(--bad); border-color: var(--bad); }
 
 /* ---------- votes page ---------- */
 .bigstat { display: flex; align-items: baseline; gap: 12px; margin: 2px 0 16px; }

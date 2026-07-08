@@ -53,6 +53,9 @@ export default function Settings() {
   const [nameEdit, setNameEdit] = useState("");
   const [digestEdit, setDigestEdit] = useState("");
   const [metaMsg, setMetaMsg] = useState<string | null>(null);
+  const [archived, setArchived] = useState<{ slug: string; name: string; owner_email: string; archived_at: string }[]>([]);
+  function loadArchived() { api.archivedTheses().then(setArchived).catch(() => setArchived([])); }
+  useEffect(() => { loadArchived(); }, []);
   useEffect(() => {
     if (accounts.length && !accounts.some((a) => a.slug === thesis)) setThesis(accounts[0].slug);
   }, [accounts]);
@@ -76,6 +79,20 @@ export default function Settings() {
       const r = await api.createThesis("New thesis");   // named/configured inline after it's selected
       await reload(); setThesis(r.slug); setMetaMsg("New thesis created — name it and set its keywords below.");
     } catch { setMetaMsg("Couldn't create — are you signed in?"); }
+  }
+  async function archiveThesis() {
+    if (!acct) return;
+    if (!confirm(`Archive "${acct.name}"? It's hidden everywhere and its daily digest pauses. Votes and settings are kept — you can restore it below anytime.`)) return;
+    const code = await api.archiveThesis(thesis, true);
+    if (code === 403) { location.href = "/login"; return; }
+    if (code === 400) { setMetaMsg("Can't archive your only active thesis."); return; }
+    if (code === 200) { await reload(); loadArchived(); }   // selection falls back to first active thesis
+    else setMetaMsg("Couldn't archive — try again.");
+  }
+  async function unarchiveThesis(slug: string) {
+    const code = await api.archiveThesis(slug, false);
+    if (code === 403) { location.href = "/login"; return; }
+    if (code === 200) { loadArchived(); await reload(); setThesis(slug); }
   }
   const lastEdited = acct?.updated_at ? new Date(acct.updated_at).toLocaleString() : null;
   const [tier1, setTier1] = useState(""); const [tier2, setTier2] = useState("");
@@ -157,7 +174,8 @@ export default function Settings() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12, flexWrap: "wrap" }}>
-          <button className="miniact" onClick={(e) => { e.stopPropagation(); saveMeta(); }}>Save name &amp; recipients</button>
+          <button className="miniact" onClick={(e) => { e.stopPropagation(); saveMeta(); }}>Update</button>
+          <button className="miniact ghost" onClick={(e) => { e.stopPropagation(); archiveThesis(); }} title="Hide this thesis and pause its digest (reversible)">Archive</button>
           {metaMsg && <span className="live">{metaMsg}</span>}
           {lastEdited && <span className="note" style={{ marginLeft: "auto" }}>Settings last edited {lastEdited}</span>}
         </div>
@@ -242,6 +260,26 @@ export default function Settings() {
         {saved !== null && !saveErr && <span style={{ marginLeft: 14 }} className="live">re-ranked live · {saved} deals now clear this thesis</span>}
         {saveErr && <span style={{ marginLeft: 14, color: "var(--bad)" }} className="note">{saveErr}</span>}
       </>)}
+
+      {archived.length > 0 && (
+        <div className="panel" style={{ marginTop: 28 }}>
+          <p className="card-title">Archived theses</p>
+          <p className="card-note">Hidden from the app and not sending a digest. Their votes and settings are kept — restore any one to bring it back.</p>
+          <table className="dbtable" style={{ marginTop: 4 }}>
+            <thead><tr><th>Name</th><th>Owner</th><th>Archived</th><th></th></tr></thead>
+            <tbody>
+              {archived.map((a) => (
+                <tr key={a.slug}>
+                  <td>{a.name}</td>
+                  <td className="muted">{a.owner_email || "—"}</td>
+                  <td className="muted nowrap">{a.archived_at ? new Date(a.archived_at).toLocaleDateString() : "—"}</td>
+                  <td className="r"><button className="miniact ghost" onClick={() => unarchiveThesis(a.slug)}>Unarchive</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </main>
   );
 }

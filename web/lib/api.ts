@@ -14,6 +14,7 @@ async function post(path: string, body: any) {
 
 export const api = {
   accounts: () => get("/accounts"),
+  archivedTheses: () => get("/accounts/archived"),
   createThesis: (name: string) => post("/accounts", { name }).then((r) => r.json()),
   async updateThesis(slug: string, patch: { name?: string; digest_emails?: string }) {
     const r = await fetch(`${BASE}/accounts/${slug}`, {
@@ -22,6 +23,8 @@ export const api = {
     });
     return r.status;
   },
+  archiveThesis: (slug: string, archived: boolean) =>
+    post(`/accounts/${slug}/archive`, { archived }).then((r) => r.status),
   board: (account: string, sections = "in", limit = 200) =>
     get(`/board?account=${account}&sections=${sections}&limit=${limit}`),
   settings: (account: string) => get(`/settings/${account}`),

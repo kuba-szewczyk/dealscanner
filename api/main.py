@@ -47,14 +47,24 @@ def health():
 
 @app.get("/accounts")
 def accounts(request: Request):
-    """Every thesis: slug, display name, last-edited time, and (signed-in only) its digest
-    recipients. Public callers get names for the board lens; PII (emails) needs auth."""
+    """Active theses: slug, display name, owner, last-edited time, and (signed-in only)
+    digest recipients. Archived theses are excluded here — see /accounts/archived.
+    Public callers get names for the board lens; PII (emails) needs auth."""
     conn = db.connect()
     rows = thesis.list_accounts(conn)
     if not _signed_in(request):
         for r in rows:
             r.pop("digest_emails", None)
+            r.pop("owner_email", None)
     return rows
+
+
+@app.get("/accounts/archived")
+def archived_accounts(request: Request):
+    """Archived theses (name, owner, when archived) for the restore list. Operators only."""
+    if not _signed_in(request):
+        raise HTTPException(403, "sign in required")
+    return thesis.list_archived(db.connect())
 
 
 @app.post("/accounts")
@@ -66,7 +76,8 @@ def create_account(request: Request, payload: dict = Body(...)):
     if not name:
         raise HTTPException(400, "thesis name is required")
     conn = db.connect()
-    slug = thesis.create_account(conn, name, (payload.get("digest_emails") or "").strip())
+    owner = authmod.email_from_session(request.cookies.get("ds_session"))
+    slug = thesis.create_account(conn, name, (payload.get("digest_emails") or "").strip(), owner_email=owner)
     return {"slug": slug, "name": name}
 
 
@@ -82,6 +93,23 @@ def update_account(slug: str, request: Request, payload: dict = Body(...)):
     except KeyError:
         raise HTTPException(404, f"unknown thesis '{slug}'")
     return {"ok": True}
+
+
+@app.post("/accounts/{slug}/archive")
+def archive_account(slug: str, request: Request, payload: dict = Body(...)):
+    """Soft-archive or restore a thesis. Archiving hides it everywhere and pauses its
+    digest; all settings and votes are kept. Signed-in operators only."""
+    if not _signed_in(request):
+        raise HTTPException(403, "sign in required")
+    archived = bool(payload.get("archived", True))
+    conn = db.connect()
+    if archived and len(thesis.list_accounts(conn)) <= 1:
+        raise HTTPException(400, "can't archive your only active thesis")
+    try:
+        thesis.set_archived(conn, slug, archived)
+    except KeyError:
+        raise HTTPException(404, f"unknown thesis '{slug}'")
+    return {"ok": True, "archived": archived}
 
 
 @app.get("/board")
