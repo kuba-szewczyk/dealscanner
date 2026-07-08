@@ -190,13 +190,24 @@ _URL_RE = re.compile(r'https?://[^\s()<>"\'\]]+')
 REEXTRACT_DAYS = 7
 
 
-def _page_fingerprint(md: str, base_url: str) -> str | None:
-    """A stable signature of the LISTINGS on a page: the set of same-domain links it contains.
-    New/removed listings change the set; volatile text ('posted 3 days ago', ad copy) doesn't.
-    Returns None when the page has no own-domain links (can't fingerprint -> always extract)."""
+def _all_links(md: str) -> set[str]:
+    """Every absolute URL on the page, normalized to the same canonical form as a stored
+    listing_url — used to bump last_seen for listings that are STILL present (freshness)."""
+    return {normalize_url(u) for u in _URL_RE.findall(md or "")}
+
+
+def _listing_links(md: str, base_url: str) -> set[str]:
+    """The page's own-domain links, normalized. New listings add to this set; a genuinely
+    new URL here means 'something new to extract'. Reordering/removals don't add anything,
+    so they no longer force a re-extraction (that was the old fingerprint's failure)."""
     host = urlparse(base_url).netloc.lower().replace("www.", "")
-    urls = {u.rstrip("/") for u in _URL_RE.findall(md or "")
+    return {normalize_url(u) for u in _URL_RE.findall(md or "")
             if urlparse(u).netloc.lower().replace("www.", "") == host}
+
+
+def _page_fingerprint(md: str, base_url: str) -> str | None:
+    """SHA1 of the own-domain link set — kept only for the broker_stats note/debugging."""
+    urls = _listing_links(md, base_url)
     if not urls:
         return None
     return hashlib.sha1("\n".join(sorted(urls)).encode()).hexdigest()
@@ -209,6 +220,21 @@ def _days_since(iso: str | None) -> float:
         return (datetime.now(timezone.utc) - datetime.fromisoformat(iso)).total_seconds() / 86400
     except (ValueError, TypeError):
         return 1e9
+
+
+def _bump_present(conn, name: str, page_links: set[str], today: str) -> int:
+    """On a skip, keep freshness honest: bump last_seen ONLY for this broker's live listings
+    whose URL is still on the page. Listings that dropped off aren't bumped, so they age into
+    'stale' / get marked sold by the weekly full refresh — no false 'still fresh'."""
+    rows = conn.execute(
+        "SELECT normalized_url FROM listings WHERE broker=? AND is_sold=0", (name,)).fetchall()
+    present = [r["normalized_url"] for r in rows if r["normalized_url"] in page_links]
+    for chunk_start in range(0, len(present), 400):     # keep SQL variable count sane
+        chunk = present[chunk_start:chunk_start + 400]
+        qs = ",".join("?" * len(chunk))
+        conn.execute(f"UPDATE listings SET last_seen=? WHERE broker=? AND normalized_url IN ({qs})",
+                     [today, name, *chunk])
+    return len(present)
 
 
 def scrape_one(name: str, url: str, conn, client, excl: dict,
@@ -235,18 +261,31 @@ def scrape_one(name: str, url: str, conn, client, excl: dict,
                 "pages": pginfo["pages"], "chars_fed": min(len(md), CHAR_FEED),
                 "out_truncated": False, "cost_usd": 0.0, "dead": dead}
 
-    # Change detection: if the page's listing link-set is byte-identical to last time (and we
-    # extracted it recently), skip the LLM call entirely — the expensive 98% of a scrape that
-    # mostly re-reads unchanged pages. We still FETCHED the page above, so we KNOW it's unchanged.
-    fp = _page_fingerprint(md, url)
+    # Change detection: extraction is the expensive 98% of a scrape, and on a typical day a
+    # broker page introduces NO new listing — it's just reordered, or a sold one dropped off.
+    # So we skip the LLM call whenever no NEW own-domain URL appeared since we last saw the page.
+    # (The old gate required a byte-identical link set, which almost never held — one removal or
+    # reorder forced a full, wasteful re-extract.) The REEXTRACT_DAYS backstop still forces a
+    # full re-read weekly, which catches price / sold / financial changes on existing listings.
+    # Detect "new listing" against ALL links on the page, not just same-domain: ~7% of brokers
+    # host their listings on another domain (bizbuysell, dealrelations, a subdomain), and a
+    # same-domain-only gate would never see their new listings. Stable nav/social links cancel
+    # out in the diff; a rare churning non-listing link just costs an extra extraction (safe).
+    page_links = _all_links(md)
     prev = conn.execute(
-        "SELECT last_link_hash, last_extracted_at FROM broker_sources WHERE name=?", (name,)).fetchone()
-    if (fp and prev and prev["last_link_hash"] == fp
-            and _days_since(prev["last_extracted_at"]) < REEXTRACT_DAYS):
-        now = datetime.now(timezone.utc).isoformat()
-        bumped = conn.execute("UPDATE listings SET last_seen=? WHERE broker=? AND is_sold=0",
-                              (_today(), name)).rowcount
-        note = f"{name}: unchanged — extraction skipped ({bumped} kept fresh), pages={pginfo['pages']}"
+        "SELECT last_link_urls, last_extracted_at FROM broker_sources WHERE name=?", (name,)).fetchone()
+    prev_links = set((prev["last_link_urls"] or "").split("\n")) - {""} if prev else set()
+    new_links = page_links - prev_links
+    fp = _page_fingerprint(md, url)
+    now = datetime.now(timezone.utc).isoformat()
+
+    fresh_read = prev and _days_since(prev["last_extracted_at"]) < REEXTRACT_DAYS
+    if page_links and prev_links and not new_links and fresh_read:
+        bumped = _bump_present(conn, name, page_links, _today())
+        # Track the current set so a listing that appears tomorrow is detected as new.
+        conn.execute("UPDATE broker_sources SET last_link_urls=? WHERE name=?",
+                     ("\n".join(sorted(page_links)), name))
+        note = f"{name}: no new listings — extraction skipped ({bumped} kept fresh), pages={pginfo['pages']}"
         cur = conn.execute(
             "INSERT INTO runs(kind, started_at, ended_at, listings_processed, new_count, cost_usd, note) "
             "VALUES ('scrape',?,?,?,?,?,?)", (started, now, 0, 0, 0.0, note))
@@ -333,9 +372,11 @@ def scrape_one(name: str, url: str, conn, client, excl: dict,
         (run_id, name, status, inserted, len(cards), chars_fed, pginfo["pages"], note,
          datetime.now(timezone.utc).isoformat()),
     )
-    # Remember this page's fingerprint so an identical page next time skips the LLM call.
-    conn.execute("UPDATE broker_sources SET last_link_hash=?, last_extracted_at=? WHERE name=?",
-                 (fp, datetime.now(timezone.utc).isoformat(), name))
+    # Remember this page's link set + when we fully extracted it, so tomorrow we can tell whether
+    # any NEW listing appeared (skip if not) and force a full re-read after REEXTRACT_DAYS.
+    conn.execute(
+        "UPDATE broker_sources SET last_link_hash=?, last_link_urls=?, last_extracted_at=? WHERE name=?",
+        (fp, "\n".join(sorted(page_links)), datetime.now(timezone.utc).isoformat(), name))
     conn.commit()
     return {"broker": name, "cards": len(cards), "inserted": inserted, "refreshed": refreshed,
             "tagged": tagged, "pages": pginfo["pages"], "chars_fed": chars_fed,

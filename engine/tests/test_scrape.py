@@ -205,3 +205,32 @@ def test_scrape_one_reextracts_when_links_change(monkeypatch, conn):
     _patch_fetch(monkeypatch, md=_P5)
     r = scrape.scrape_one("B", "https://b.com/listings", conn, client, {})
     assert not r.get("unchanged")
+
+
+def test_scrape_one_skips_when_listing_removed_but_none_new(monkeypatch, conn):
+    """The key win: a page that only LOST a listing (or reordered) has no NEW url, so we skip
+    the LLM. The old byte-identical fingerprint would have wastefully re-extracted it."""
+    conn.execute("INSERT INTO broker_sources(name, url, status) VALUES ('B','https://b.com/listings','live')")
+    conn.commit()
+    client = _Client([{"listing_url": "https://b.com/listing/0", "business_name": "X", "industry": "Water"}])
+    monkeypatch.setattr(scrape, "_today", lambda: "2026-06-23")
+    _patch_fetch(monkeypatch, md=_P5)                         # day 1: listings 0..4, full extract
+    r1 = scrape.scrape_one("B", "https://b.com/listings", conn, client, {})
+    assert not r1.get("unchanged")
+    _patch_fetch(monkeypatch, md=_P4)                         # day 2: listing 4 gone, nothing new
+    monkeypatch.setattr(scrape, "_today", lambda: "2026-06-24")
+    r2 = scrape.scrape_one("B", "https://b.com/listings", conn, client, {})
+    assert r2.get("unchanged") is True and r2["cost_usd"] == 0.0
+
+
+def test_bump_present_only_bumps_still_listed(conn):
+    for u in ("https://b.com/listing/0", "https://b.com/listing/gone"):
+        conn.execute("INSERT INTO listings(normalized_url, listing_url, broker, is_sold, last_seen) "
+                     "VALUES (?,?, 'B', 0, '2026-06-01')", (scrape.normalize_url(u), u))
+    conn.commit()
+    n = scrape._bump_present(conn, "B", {scrape.normalize_url("https://b.com/listing/0")}, "2026-06-24")
+    assert n == 1
+    seen = {r["listing_url"]: r["last_seen"] for r in
+            conn.execute("SELECT listing_url, last_seen FROM listings")}
+    assert seen["https://b.com/listing/0"] == "2026-06-24"    # still listed -> fresh
+    assert seen["https://b.com/listing/gone"] == "2026-06-01"  # dropped off -> ages out

@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS broker_sources (
     last_blocked_at TEXT,                         -- when last blocked (Firecrawl can't load the page)
     last_block_reason TEXT,
     last_link_hash  TEXT,                         -- fingerprint of the last-extracted page
+    last_link_urls  TEXT,                          -- newline-joined normalized listing URLs last seen (new-listing detection)
     last_extracted_at TEXT,                       -- when we last ran the LLM extraction on it
     created_at      TEXT
 );
@@ -195,6 +196,7 @@ _ADD_COLUMNS = {
         "last_blocked_at": "TEXT",
         "last_block_reason": "TEXT",
         "last_link_hash": "TEXT",             # fingerprint of last-extracted page (skip if unchanged)
+        "last_link_urls": "TEXT",             # last-seen normalized listing URLs (skip if no NEW ones)
         "last_extracted_at": "TEXT",
     },
     "runs": {
