@@ -52,7 +52,6 @@ export default function Settings() {
   const acct = accounts.find((a) => a.slug === thesis);
   const [nameEdit, setNameEdit] = useState("");
   const [digestEdit, setDigestEdit] = useState("");
-  const [newName, setNewName] = useState("");
   const [metaMsg, setMetaMsg] = useState<string | null>(null);
   useEffect(() => {
     if (accounts.length && !accounts.some((a) => a.slug === thesis)) setThesis(accounts[0].slug);
@@ -73,11 +72,9 @@ export default function Settings() {
     else setMetaMsg("Couldn't save — try again.");
   }
   async function createThesis() {
-    const name = newName.trim();
-    if (!name) return;
     try {
-      const r = await api.createThesis(name);
-      setNewName(""); await reload(); setThesis(r.slug);
+      const r = await api.createThesis("New thesis");   // named/configured inline after it's selected
+      await reload(); setThesis(r.slug); setMetaMsg("New thesis created — name it and set its keywords below.");
     } catch { setMetaMsg("Couldn't create — are you signed in?"); }
   }
   const lastEdited = acct?.updated_at ? new Date(acct.updated_at).toLocaleString() : null;
@@ -144,6 +141,7 @@ export default function Settings() {
             <span className="dot" />{a.name}
           </button>
         ))}
+        <button className="lens-add" onClick={createThesis} title="Create a new thesis">+ New</button>
       </div>
 
       <div className="panel" style={{ marginBottom: 20 }}>
@@ -162,14 +160,6 @@ export default function Settings() {
           <button className="miniact" onClick={(e) => { e.stopPropagation(); saveMeta(); }}>Save name &amp; recipients</button>
           {metaMsg && <span className="live">{metaMsg}</span>}
           {lastEdited && <span className="note" style={{ marginLeft: "auto" }}>Settings last edited {lastEdited}</span>}
-        </div>
-        <div style={{ borderTop: "1px solid var(--line)", marginTop: 16, paddingTop: 14, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div className="field" style={{ flex: "1 1 240px" }}>
-            <label>Add a new thesis <span className="def">starts blank — you define the keywords below</span></label>
-            <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createThesis()} placeholder="e.g. Dental practices" />
-          </div>
-          <button className="btn" onClick={(e) => { e.stopPropagation(); createThesis(); }}>+ Create thesis</button>
         </div>
       </div>
 
