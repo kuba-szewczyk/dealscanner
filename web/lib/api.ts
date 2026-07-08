@@ -14,6 +14,14 @@ async function post(path: string, body: any) {
 
 export const api = {
   accounts: () => get("/accounts"),
+  createThesis: (name: string) => post("/accounts", { name }).then((r) => r.json()),
+  async updateThesis(slug: string, patch: { name?: string; digest_emails?: string }) {
+    const r = await fetch(`${BASE}/accounts/${slug}`, {
+      method: "PUT", headers: { "content-type": "application/json" },
+      credentials: "include", body: JSON.stringify(patch),
+    });
+    return r.status;
+  },
   board: (account: string, sections = "in", limit = 200) =>
     get(`/board?account=${account}&sections=${sections}&limit=${limit}`),
   settings: (account: string) => get(`/settings/${account}`),

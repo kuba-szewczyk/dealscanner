@@ -46,9 +46,42 @@ def health():
 
 
 @app.get("/accounts")
-def accounts():
+def accounts(request: Request):
+    """Every thesis: slug, display name, last-edited time, and (signed-in only) its digest
+    recipients. Public callers get names for the board lens; PII (emails) needs auth."""
     conn = db.connect()
-    return [dict(r) for r in conn.execute("SELECT slug, name FROM accounts").fetchall()]
+    rows = thesis.list_accounts(conn)
+    if not _signed_in(request):
+        for r in rows:
+            r.pop("digest_emails", None)
+    return rows
+
+
+@app.post("/accounts")
+def create_account(request: Request, payload: dict = Body(...)):
+    """Create a new thesis (blank template). Signed-in operators only."""
+    if not _signed_in(request):
+        raise HTTPException(403, "sign in required")
+    name = (payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "thesis name is required")
+    conn = db.connect()
+    slug = thesis.create_account(conn, name, (payload.get("digest_emails") or "").strip())
+    return {"slug": slug, "name": name}
+
+
+@app.put("/accounts/{slug}")
+def update_account(slug: str, request: Request, payload: dict = Body(...)):
+    """Rename a thesis and/or set its digest recipients. Signed-in operators only."""
+    if not _signed_in(request):
+        raise HTTPException(403, "sign in required")
+    conn = db.connect()
+    try:
+        thesis.update_account(conn, slug, name=payload.get("name"),
+                              digest_emails=payload.get("digest_emails"))
+    except KeyError:
+        raise HTTPException(404, f"unknown thesis '{slug}'")
+    return {"ok": True}
 
 
 @app.get("/board")

@@ -2,9 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, safeHref } from "@/lib/api";
 import { CAT_CLASS, catShort, fmtM, parseDate } from "@/lib/deal";
+import { useAccounts } from "@/lib/theses";
 import DealCard from "../DealCard";
 
-const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
 // Year dropped — every listing is the current year.
 const fmtMD = (s?: string) => {
   const d = parseDate(s);
@@ -26,6 +26,7 @@ const COLS: { key: string; label: string; type: SortType; align?: "r"; get: (r: 
 ];
 
 export default function Search() {
+  const { labelOf } = useAccounts();
   const [q, setQ] = useState("");
   const [res, setRes] = useState<any[] | null>(null);
   const [count, setCount] = useState(0);
@@ -179,7 +180,7 @@ export default function Search() {
             <div className="modal-head">
               <span className="matches">
                 {detail && (detail.relevant_theses?.length
-                  ? <>Matches: {detail.relevant_theses.map((t: string) => LABEL[t] || t).join(", ")}</>
+                  ? <>Matches: {detail.relevant_theses.map((t: string) => labelOf(t)).join(", ")}</>
                   : "Not currently matching a thesis")}
               </span>
               <button className="modal-x" data-autofocus onClick={() => setOpenId(null)} aria-label="Close">✕</button>

@@ -2,8 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, Deal, safeHref } from "@/lib/api";
 import DealCard from "./DealCard";
-
-const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
+import { useAccounts, thesisColor } from "@/lib/theses";
 const FLAG_LABEL: Record<string, string> = {
   geo_t1: "Tier-1 metro", geo_t2: "Tier-2 state", margin_gt_20: "20%+ EBITDA margin",
   owner_retiring: "Owner retiring", recurring_40: "40%+ recurring",
@@ -39,7 +38,12 @@ const fmtDate = (s?: string) => {
 };
 
 export default function Board() {
+  const { accounts, labelOf } = useAccounts();
   const [thesis, setThesis] = useState("water");
+  // Once the thesis list loads, make sure the selected one still exists (renamed/removed elsewhere).
+  useEffect(() => {
+    if (accounts.length && !accounts.some((a) => a.slug === thesis)) setThesis(accounts[0].slug);
+  }, [accounts]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [spend, setSpend] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -61,7 +65,7 @@ export default function Board() {
     const w = q.get("window");
     if (w && ["24h", "7d", "30d"].includes(w)) setPeriod(w);
     const t = q.get("thesis");
-    if (t && ["water", "healthcare"].includes(t)) setThesis(t);
+    if (t) setThesis(t);   // validated against the loaded account list above
     api.me().then((d) => setSignedIn(!!d.email)).catch(() => setSignedIn(false));
   }, []);
 
@@ -149,18 +153,19 @@ export default function Board() {
       {showIntro && !signedIn && (
         <div className="intro">
           <span><b>DealScanner</b> aggregates business-for-sale listings from 200+ brokers into one thesis-filtered feed for searchers.
-            This is the <b>{LABEL[thesis]}</b> board — new deals that clear that thesis. <a href="/help">How it works →</a></span>
+            This is the <b>{labelOf(thesis)}</b> board — new deals that clear that thesis. <a href="/help">How it works →</a></span>
           <button className="intro-x" onClick={dismissIntro} aria-label="Dismiss">✕</button>
         </div>
       )}
       <div className="boardhead">
-        <h1 className="h1">{LABEL[thesis]} deals</h1>
+        <h1 className="h1">{labelOf(thesis)} deals</h1>
         <p className="sub">New businesses that match your acquisition thesis, ranked by fit and refreshed daily. Switch thesis to re-score the same listings.</p>
         <div className="toolbar">
           <div className="lens" role="group" aria-label="Thesis">
-            {["water", "healthcare"].map((t) => (
-              <button key={t} className={t} aria-pressed={thesis === t} onClick={() => setThesis(t)}>
-                <span className="dot" />{LABEL[t]}
+            {accounts.map((a, i) => (
+              <button key={a.slug} aria-pressed={thesis === a.slug} onClick={() => setThesis(a.slug)}
+                style={thesis === a.slug ? { background: thesisColor(a.slug, i) } : undefined}>
+                <span className="dot" />{a.name}
               </button>
             ))}
           </div>
@@ -194,7 +199,7 @@ export default function Board() {
       {loading && <p className="note">Loading deals…</p>}
       {!loading && filtered.length === 0 && nearFiltered.length === 0 && (
         <div className="panel note">
-          The scan ran{lastScan ? ` (last: ${fmtDate(lastScan)})` : ""} — nothing in the {LABEL[thesis]} category in this window.
+          The scan ran{lastScan ? ` (last: ${fmtDate(lastScan)})` : ""} — nothing in the {labelOf(thesis)} category in this window.
           Widen the date range above, or adjust the keywords and size band under Thesis.
         </div>
       )}
@@ -221,7 +226,7 @@ export default function Board() {
 
       {!loading && nearFiltered.length > 0 && (
         <section>
-          <div className="tierlabel">In the {LABEL[thesis]} category <span>— on-thesis, but small, undisclosed financials, or outside the size band</span></div>
+          <div className="tierlabel">In the {labelOf(thesis)} category <span>— on-thesis, but small, undisclosed financials, or outside the size band</span></div>
           {nearFiltered.map((d: any) => (
             <DealCard key={d.id} d={d} signedIn={signedIn} voted={voted[d.id]} onVote={(v) => cast(d, v)} />
           ))}
@@ -233,7 +238,7 @@ export default function Board() {
           <div className="nqhead">
             <b>Out of scope</b>
             <span className="n">{nqGroups.total}</span>
-            <span className="nqhint">scraped but not in the {LABEL[thesis]} category — filtered out by keywords or exclusions{period !== "all" ? " · this window" : ""} — open a category to see them</span>
+            <span className="nqhint">scraped but not in the {labelOf(thesis)} category — filtered out by keywords or exclusions{period !== "all" ? " · this window" : ""} — open a category to see them</span>
           </div>
           <div className="nqbody">
             {nqGroups.cats.map(([cat, items]) => {

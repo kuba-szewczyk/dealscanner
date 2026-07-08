@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useAccounts, thesisColor } from "@/lib/theses";
 
 const LO = 0, HI = 10_000_000, STEP = 100_000;
 const fmtUSD = (v: number) =>
@@ -39,6 +40,7 @@ const NEG = [
 ];
 
 export default function Settings() {
+  const { accounts, reload } = useAccounts();
   const [thesis, setThesis] = useState("water");
   const [s, setS] = useState<any>(null);
   const [saved, setSaved] = useState<number | null>(null);
@@ -46,11 +48,39 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
+  // thesis meta (name / digest recipients / new thesis)
+  const acct = accounts.find((a) => a.slug === thesis);
+  const [nameEdit, setNameEdit] = useState("");
+  const [digestEdit, setDigestEdit] = useState("");
+  const [newName, setNewName] = useState("");
+  const [metaMsg, setMetaMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (accounts.length && !accounts.some((a) => a.slug === thesis)) setThesis(accounts[0].slug);
+  }, [accounts]);
+  useEffect(() => {
+    if (acct) { setNameEdit(acct.name || ""); setDigestEdit(acct.digest_emails || ""); setMetaMsg(null); }
+  }, [thesis, acct?.name, acct?.digest_emails]);
+
   function switchThesis(t: string) {
     if (t === thesis) return;
     if (dirty && !confirm("You have unsaved changes to this thesis. Switch and discard them?")) return;
     setThesis(t);
   }
+  async function saveMeta() {
+    const code = await api.updateThesis(thesis, { name: nameEdit.trim(), digest_emails: digestEdit.trim() });
+    if (code === 403) { location.href = "/login"; return; }
+    if (code === 200) { await reload(); setMetaMsg("Saved"); }
+    else setMetaMsg("Couldn't save — try again.");
+  }
+  async function createThesis() {
+    const name = newName.trim();
+    if (!name) return;
+    try {
+      const r = await api.createThesis(name);
+      setNewName(""); await reload(); setThesis(r.slug);
+    } catch { setMetaMsg("Couldn't create — are you signed in?"); }
+  }
+  const lastEdited = acct?.updated_at ? new Date(acct.updated_at).toLocaleString() : null;
   const [tier1, setTier1] = useState(""); const [tier2, setTier2] = useState("");
   const [context, setContext] = useState(""); const [negative, setNegative] = useState("");
   const [states, setStates] = useState(""); const [metros, setMetros] = useState("");
@@ -107,10 +137,40 @@ export default function Settings() {
     <main className="wrap" style={{ maxWidth: 820 }} onChange={() => setDirty(true)}>
       <h1 className="h1">Thesis</h1>
       <p className="sub" style={{ marginBottom: 16 }}>Define what qualifies: keywords, size band, geography, and flags. Changes re-rank every listing instantly — no re-scrape, no cost.</p>
-      <div className="lens" style={{ marginBottom: 20 }} role="group" aria-label="Thesis">
-        {["water", "healthcare"].map((t) => (
-          <button key={t} className={t} aria-pressed={thesis === t} onClick={() => switchThesis(t)}><span className="dot" />{t === "water" ? "Water" : "Healthcare"}</button>
+      <div className="lens" style={{ marginBottom: 14, flexWrap: "wrap" }} role="group" aria-label="Thesis">
+        {accounts.map((a, i) => (
+          <button key={a.slug} aria-pressed={thesis === a.slug} onClick={() => switchThesis(a.slug)}
+            style={thesis === a.slug ? { background: thesisColor(a.slug, i) } : undefined}>
+            <span className="dot" />{a.name}
+          </button>
         ))}
+      </div>
+
+      <div className="panel" style={{ marginBottom: 20 }}>
+        <p className="card-title">This thesis</p>
+        <div className="grid2" style={{ gap: 18, marginTop: 6 }}>
+          <div className="field">
+            <label>Name</label>
+            <input type="text" value={nameEdit} onChange={(e) => setNameEdit(e.target.value)} placeholder="Thesis name" />
+          </div>
+          <div className="field">
+            <label>Daily digest recipients <span className="def">comma-separated emails</span></label>
+            <input type="text" value={digestEdit} onChange={(e) => setDigestEdit(e.target.value)} placeholder="you@example.com, partner@example.com" />
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12, flexWrap: "wrap" }}>
+          <button className="miniact" onClick={(e) => { e.stopPropagation(); saveMeta(); }}>Save name &amp; recipients</button>
+          {metaMsg && <span className="live">{metaMsg}</span>}
+          {lastEdited && <span className="note" style={{ marginLeft: "auto" }}>Settings last edited {lastEdited}</span>}
+        </div>
+        <div style={{ borderTop: "1px solid var(--line)", marginTop: 16, paddingTop: 14, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div className="field" style={{ flex: "1 1 240px" }}>
+            <label>Add a new thesis <span className="def">starts blank — you define the keywords below</span></label>
+            <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createThesis()} placeholder="e.g. Dental practices" />
+          </div>
+          <button className="btn" onClick={(e) => { e.stopPropagation(); createThesis(); }}>+ Create thesis</button>
+        </div>
       </div>
 
       {s && (<>

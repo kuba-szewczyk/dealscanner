@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { api, safeHref } from "@/lib/api";
+import { useAccounts, thesisColor } from "@/lib/theses";
 
 const ORDER = ["yes", "maybe", "no"];
 const TITLE: Record<string, string> = { yes: "Yes — chase it", maybe: "Maybe — worth a look", no: "No — pass" };
-const LABEL: Record<string, string> = { water: "Water / Wastewater", healthcare: "Healthcare" };
 const PERIODS: [string, string][] = [["all", "All time"], ["24h", "24h"], ["7d", "7d"], ["30d", "30d"]];
 
 function withinWindow(iso: string, period: string): boolean {
@@ -16,8 +16,12 @@ function withinWindow(iso: string, period: string): boolean {
 }
 
 export default function Shortlist() {
+  const { accounts, labelOf } = useAccounts();
   const [d, setD] = useState<any>(null);
   const [thesis, setThesis] = useState("water");
+  useEffect(() => {
+    if (accounts.length && !accounts.some((a) => a.slug === thesis)) setThesis(accounts[0].slug);
+  }, [accounts]);
   const [period, setPeriod] = useState("all");
   const [drag, setDrag] = useState<any>(null);
   const [over, setOver] = useState<string | null>(null);
@@ -46,14 +50,15 @@ export default function Shortlist() {
       <div className="boardhead">
         <h1 className="h1">Shortlist</h1>
         <p className="sub" style={{ maxWidth: "none" }}>
-          Every verdict on {LABEL[thesis]} deals, saved with the deal&apos;s full context at vote time. Drag a deal
+          Every verdict on {labelOf(thesis)} deals, saved with the deal&apos;s full context at vote time. Drag a deal
           between columns to re-categorize. These votes are the training data for the ranking model.
         </p>
         <div className="filterbar">
           <div className="lens" role="group" aria-label="Thesis">
-            {["water", "healthcare"].map((t) => (
-              <button key={t} className={t} aria-pressed={thesis === t} onClick={() => setThesis(t)}>
-                <span className="dot" />{LABEL[t]}
+            {accounts.map((a, i) => (
+              <button key={a.slug} aria-pressed={thesis === a.slug} onClick={() => setThesis(a.slug)}
+                style={thesis === a.slug ? { background: thesisColor(a.slug, i) } : undefined}>
+                <span className="dot" />{a.name}
               </button>
             ))}
           </div>
@@ -67,7 +72,7 @@ export default function Shortlist() {
 
       {d && (
         <>
-          <div className="bigstat"><b>{votes.length}</b><span>{LABEL[thesis]} deals voted{period === "all" ? "" : " in window"}</span></div>
+          <div className="bigstat"><b>{votes.length}</b><span>{labelOf(thesis)} deals voted{period === "all" ? "" : " in window"}</span></div>
           {ORDER.map((v) => {
             const items = votes.filter((x: any) => x.verdict === v);
             return (

@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS accounts (
     id          INTEGER PRIMARY KEY,
     slug        TEXT UNIQUE NOT NULL,          -- 'water', 'healthcare'
     name        TEXT NOT NULL,
-    owner_email TEXT
+    owner_email TEXT,
+    digest_emails TEXT                            -- comma-separated daily-digest recipients
 );
 
 -- The live, editable thesis config for an account (keywords, size bands, geo,
@@ -198,6 +199,9 @@ _ADD_COLUMNS = {
         "model": "TEXT",          # Claude model for this run (per-model spend breakdown)
         "in_tokens": "INTEGER",   # Claude input tokens
         "out_tokens": "INTEGER",  # Claude output tokens
+    },
+    "accounts": {
+        "digest_emails": "TEXT",  # comma-separated daily-digest recipients for this thesis
     },
 }
 

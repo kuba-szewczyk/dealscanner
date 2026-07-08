@@ -8,6 +8,7 @@ edits happen in the DB (Settings page / PUT /settings) — that is what makes fi
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,9 +17,63 @@ import yaml
 
 THESIS_DIR = Path(__file__).resolve().parents[2] / "thesis"
 
+# A new thesis starts blank-but-valid: no keywords, a default size band, geo off.
+BLANK_SETTINGS = {
+    "size": {"ebitda_min": 1000000, "ebitda_max": 5000000, "sde_min": 1500000, "reject_below_ask": 1000000},
+    "keywords": {"tier1": [], "tier2": [], "context": [], "negative": [], "exclude_terms": []},
+    "geo": {"require": False, "tier1_metros": [], "tier2_states": []},
+    "categories": {"exclude": []},
+    "flags": {"positive": ["geo_t1", "geo_t2", "margin_gt_20", "owner_retiring", "recurring_40"],
+              "negative": ["low_margin_lt_15", "overpriced", "franchise_resale", "partial"]},
+    "ranking": {"weights": {"relevance": 2.0, "flag_score": 1.0}},
+    "exclusions": {},
+}
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def slugify(name: str, conn: sqlite3.Connection) -> str:
+    """URL-safe, unique slug from a display name. Slugs are stable keys (never renamed)."""
+    base = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-") or "thesis"
+    slug, n = base, 2
+    while conn.execute("SELECT 1 FROM accounts WHERE slug=?", (slug,)).fetchone():
+        slug, n = f"{base}-{n}", n + 1
+    return slug
+
+
+def create_account(conn: sqlite3.Connection, name: str, digest_emails: str = "") -> str:
+    """Create a new thesis (account + blank editable settings). Returns its slug."""
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("thesis name is required")
+    slug = slugify(name, conn)
+    conn.execute("INSERT INTO accounts(slug, name, digest_emails) VALUES (?,?,?)",
+                 (slug, name, digest_emails))
+    aid = conn.execute("SELECT id FROM accounts WHERE slug=?", (slug,)).fetchone()["id"]
+    conn.execute("INSERT INTO account_settings(account_id, settings_json, updated_at) VALUES (?,?,?)",
+                 (aid, json.dumps(BLANK_SETTINGS), _now()))
+    conn.commit()
+    return slug
+
+
+def update_account(conn: sqlite3.Connection, slug: str, name: str | None = None,
+                   digest_emails: str | None = None) -> None:
+    """Rename a thesis and/or set its digest recipients. Slug stays fixed."""
+    aid = account_id_for(conn, slug)
+    if name is not None and name.strip():
+        conn.execute("UPDATE accounts SET name=? WHERE id=?", (name.strip(), aid))
+    if digest_emails is not None:
+        conn.execute("UPDATE accounts SET digest_emails=? WHERE id=?", (digest_emails.strip(), aid))
+    conn.commit()
+
+
+def list_accounts(conn: sqlite3.Connection) -> list[dict]:
+    """All theses with display name, digest recipients, and when settings were last edited."""
+    return [dict(r) for r in conn.execute(
+        "SELECT a.slug, a.name, COALESCE(a.digest_emails,'') digest_emails, s.updated_at "
+        "FROM accounts a LEFT JOIN account_settings s ON s.account_id = a.id ORDER BY a.id").fetchall()]
 
 
 def load_yaml(path: Path) -> dict:
